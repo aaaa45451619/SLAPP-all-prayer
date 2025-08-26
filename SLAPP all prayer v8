@@ -1,7 +1,7 @@
 -- [[
 --  Universal-Script
 --  Modified by: Gemini
---  Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization
+--  Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization, Single Target Kill
 -- ]]
 
 -- UI Drag Function (Fallback)
@@ -49,88 +49,89 @@ textbutton.Parent = mainframe2
 
 local as = false
 function dobv(v,char)
-	local undo = false
-	if as then
-		if v:IsA("BodyAngularVelocity") then
-			undo = true
-			v:Destroy()
-		elseif v:IsA("BodyGyro") and v.MaxTorque ~= Vector3.new(8999999488, 8999999488, 8999999488) and v.D ~= 500 and v.D ~= 50 and v.P ~= 90000 then
-			undo = true
-			v:Destroy()
-		elseif v:IsA("BodyVelocity") and v.MaxForce ~= Vector3.new(8999999488, 8999999488, 8999999488) and v.Velocity ~= Vector3.new(0,0,0) then
-			undo = true
-			v:Destroy()
-		elseif v:IsA("BasePart") then
-			v.ChildAdded:Connect(function(v2)
-				dobv(v2,char)
-			end)
-		end
-		if undo and char and char:FindFirstChild("Humanoid") then
-			char.Humanoid.Sit = false
-			char.Humanoid.PlatformStand = false
-		end
-	end
+    local undo = false
+    if as then
+        if v:IsA("BodyAngularVelocity") then
+            undo = true
+            v:Destroy()
+        elseif v:IsA("BodyGyro") and v.MaxTorque ~= Vector3.new(8999999488, 8999999488, 8999999488) and v.D ~= 500 and v.D ~= 50 and v.P ~= 90000 then
+            undo = true
+            v:Destroy()
+        elseif v:IsA("BodyVelocity") and v.MaxForce ~= Vector3.new(8999999488, 8999999488, 8999999488) and v.Velocity ~= Vector3.new(0,0,0) then
+            undo = true
+            v:Destroy()
+        elseif v:IsA("BasePart") then
+            v.ChildAdded:Connect(function(v2)
+                dobv(v2,char)
+            end)
+        end
+        if undo and char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.Sit = false
+            char.Humanoid.PlatformStand = false
+        end
+    end
 end
 textbutton.MouseButton1Click:Connect(function()
-	as = not as
-	if as then
-		textbutton.Text = "Anti-Slap/Fling: ON"
-		if localplr.Character then
-			for i,v in pairs(localplr.Character:GetChildren()) do
-				dobv(v,localplr.Character)
-				for i,v in pairs(v:GetChildren()) do
-					dobv(v,localplr.Character)
-				end
-			end
-		end
-	else
-		textbutton.Text = "Anti-Slap/Fling: OFF"
-	end
+    as = not as
+    if as then
+        textbutton.Text = "Anti-Slap/Fling: ON"
+        if localplr.Character then
+            for i,v in pairs(localplr.Character:GetChildren()) do
+                dobv(v,localplr.Character)
+                for i,v in pairs(v:GetChildren()) do
+                    dobv(v,localplr.Character)
+                end
+            end
+        end
+    else
+        textbutton.Text = "Anti-Slap/Fling: OFF"
+    end
 end)
 function dc(c)
-	for i,v in pairs(c:GetChildren()) do
-		dobv(v,c)
-	end
-	c.ChildAdded:Connect(function(v)
-		dobv(v,c)
-	end)
+    for i,v in pairs(c:GetChildren()) do
+        dobv(v,c)
+    end
+    c.ChildAdded:Connect(function(v)
+        dobv(v,c)
+    end)
 end
 if localplr.Character then
-	dc(localplr.Character)
+    dc(localplr.Character)
 end
 localplr.CharacterAdded:Connect(dc)
 
 -- Get Glove Function
 function getglove()
-	for i,v in pairs(game.Players:GetPlayers()) do
-		if v.Character then
-			for i,v in pairs(v.Character:GetChildren()) do
-				if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
-					return v,v.Event
-				end
-			end
-		end
-		if v:FindFirstChild("Backpack") then
-			for i,v in pairs(v.Backpack:GetChildren()) do
-				if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
-					return v,v.Event
-				end
-			end
-		end
-	end
-	for i,v in pairs(game.ReplicatedStorage:GetDescendants()) do
-		if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
-			return v,v.Event
-		end
-	end
-	return nil, nil
+    for i,v in pairs(game.Players:GetPlayers()) do
+        if v.Character then
+            for i,v in pairs(v.Character:GetChildren()) do
+                if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
+                    return v,v.Event
+                end
+            end
+        end
+        if v:FindFirstChild("Backpack") then
+            for i,v in pairs(v.Backpack:GetChildren()) do
+                if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
+                    return v,v.Event
+                end
+            end
+        end
+    end
+    for i,v in pairs(game.ReplicatedStorage:GetDescendants()) do
+        if v:IsA("Tool") and (string.find(v.Name:lower(),"glove") or string.find(v.Name:lower(),"slap")) and v:FindFirstChild("Event") then
+            return v,v.Event
+        end
+    end
+    return nil, nil
 end
 
 local whitelistPlayers = {}
 local function isWhitelisted(player)
     local lname = player.Name:lower()
+ local dname = player.DisplayName:lower()
     for _, wn in pairs(whitelistPlayers) do
-        if string.find(lname, wn) then
+        if string.find(lname, wn) or string.find(dname, wn) then
             return true
         end
     end
@@ -159,14 +160,14 @@ textbutton2.BackgroundColor3 = Color3.fromRGB(50,50,50)
 textbutton2.BorderColor3 = Color3.fromRGB(255,255,255)
 textbutton2.Parent = mainframe2
 textbutton2.MouseButton1Click:Connect(function()
-	local glove,event = getglove()
-	if event then
-		for _, v in pairs(game.Players:GetPlayers()) do
-			if v ~= localplr and not isWhitelisted(v) and v.Character then
-				event:FireServer("slash",v.Character,Vector3.new(0,-tonumber("inf"),0))
-			end
-		end
-	end
+    local glove,event = getglove()
+    if event then
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= localplr and not isWhitelisted(v) and v.Character then
+                event:FireServer("slash",v.Character,Vector3.new(0,-tonumber("inf"),0))
+            end
+        end
+    end
 end)
 
 -- Fling All Button
@@ -180,16 +181,16 @@ textbutton3.BackgroundColor3 = Color3.fromRGB(50,50,50)
 textbutton3.BorderColor3 = Color3.fromRGB(255,255,255)
 textbutton3.Parent = mainframe2
 textbutton3.MouseButton1Click:Connect(function()
-	local glove, event = getglove()
-	if event then
-		for _, v in pairs(game.Players:GetPlayers()) do
-			if v ~= localplr and not isWhitelisted(v) and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-				event:FireServer("slash", v.Character, Vector3.new(0, tonumber("inf"), 0))
-				local hRootPart = v.Character.HumanoidRootPart
-				hRootPart.Position = hRootPart.Position + Vector3.new(0, 50, 0)
-			end
-		end
-	end
+    local glove, event = getglove()
+    if event then
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= localplr and not isWhitelisted(v) and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                event:FireServer("slash", v.Character, Vector3.new(0, tonumber("inf"), 0))
+                local hRootPart = v.Character.HumanoidRootPart
+                hRootPart.Position = hRootPart.Position + Vector3.new(0, 50, 0)
+            end
+        end
+    end
 end)
 
 -- Target Player Input
@@ -229,12 +230,39 @@ flingAllTargetBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- 単体 Kill Button
+local singleKillBtn = Instance.new("TextButton")
+singleKillBtn.Position = UDim2.new(0,0,1 + 1.4*5,0)
+singleKillBtn.Size = UDim2.new(1,0,1.4,0)
+singleKillBtn.Text = "Kill (Target)"
+singleKillBtn.TextScaled = true
+singleKillBtn.TextColor3 = Color3.fromRGB(255,255,255)
+singleKillBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+singleKillBtn.BorderColor3 = Color3.fromRGB(255,255,255)
+singleKillBtn.Parent = mainframe2
+
+singleKillBtn.MouseButton1Click:Connect(function()
+    local inputText = textbox.Text:lower()
+    local glove, event = getglove()
+    if event and inputText ~= "" then
+        for _, plr in pairs(game.Players:GetPlayers()) do
+            if plr ~= localplr and not isWhitelisted(plr) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                if string.find(plr.Name:lower(), inputText) or (plr.DisplayName and string.find(plr.DisplayName:lower(), inputText)) then
+                    event:FireServer("slash", plr.Character, Vector3.new(0,-tonumber("inf"),0))
+                    --print("Killed -> " .. plr.Name)
+                    break
+                end
+            end
+        end
+    end
+end)
+
 -- Loop Fling (Target) Button
 local isLoopFlinging = false
 local loopFlingThread = nil
 
 local loopFlingBtn = Instance.new("TextButton")
-loopFlingBtn.Position = UDim2.new(0, 0, 1 + 1.4*5, 0)
+loopFlingBtn.Position = UDim2.new(0, 0, 1 + 1.4*6, 0)
 loopFlingBtn.Size = UDim2.new(1, 0, 1.4, 0)
 loopFlingBtn.Text = "Loop Fling (Target): Off"
 loopFlingBtn.TextScaled = true
@@ -261,7 +289,7 @@ loopFlingBtn.MouseButton1Click:Connect(function()
         loopFlingBtn.Text = "Loop Fling (Target): ON"
         local glove, event = getglove()
         local targetName = textbox.Text
-        
+
         if event and targetName ~= "" then
             loopFlingThread = coroutine.wrap(function()
                 while isLoopFlinging do
@@ -289,7 +317,7 @@ end)
 -- TP Fling Button
 local tpBtn = Instance.new("TextButton")
 tpBtn.Size = UDim2.new(1,0,1.4,0)
-tpBtn.Position = UDim2.new(0,0,1 + 1.4*6,0)
+tpBtn.Position = UDim2.new(0,0,1 + 1.4*7,0)
 tpBtn.Text = "TPFling"
 tpBtn.TextScaled = true
 tpBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
@@ -313,13 +341,14 @@ tpBtn.MouseButton1Click:Connect(function()
                     local diff = myHRP.Position - targetHRP.Position
                     local distance = diff.Magnitude
                     if distance < 6 then return end
-                    local factor = math.clamp(distance / 5, 1, 120)
+                    local factor = math.clamp(distance / 5, 1, 120) * 1.2
                     event:FireServer("slash", plr.Character, diff.Unit * factor)
                 end
             end
         end
     end
 end)
+
 
 -- Barrier Button
 local barrierOn = false
@@ -333,8 +362,8 @@ barrierPart.Parent = workspace
 
 local barrierBtn = Instance.new("TextButton")
 barrierBtn.Size = UDim2.new(1,0,1.4,0)
-barrierBtn.Position = UDim2.new(0,0,1 + 1.4*7,0)
-barrierBtn.Text = "Barrier: OFF"
+barrierBtn.Position = UDim2.new(0,0,1 + 1.4*8,0)
+barrierBtn.Text = "オーラ: OFF"
 barrierBtn.TextScaled = true
 barrierBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
 barrierBtn.TextColor3 = Color3.fromRGB(255,255,255)
@@ -343,7 +372,7 @@ barrierBtn.Parent = mainframe2
 
 barrierBtn.MouseButton1Click:Connect(function()
     barrierOn = not barrierOn
-    barrierBtn.Text = "Barrier: " .. (barrierOn and "ON" or "OFF")
+    barrierBtn.Text = "オーラ: " .. (barrierOn and "ON" or "OFF")
 end)
 
 -- Barrier Logic Loop
@@ -368,9 +397,9 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
--- 
+--
 local whitelistTextbox = Instance.new("TextBox")
-whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*8,0)
+whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*9,0)
 whitelistTextbox.Size = UDim2.new(1,0,1.4,0)
 whitelistTextbox.PlaceholderText = "Whitelist Players ('.' separates)"
 whitelistTextbox.TextScaled = true
@@ -380,7 +409,7 @@ whitelistTextbox.BorderColor3 = Color3.fromRGB(0,0,0)
 whitelistTextbox.ClearTextOnFocus = false
 whitelistTextbox.Parent = mainframe2
 
--- 
+--
 whitelistTextbox:GetPropertyChangedSignal("Text"):Connect(function()
     whitelistPlayers = {}
     for name in string.gmatch(whitelistTextbox.Text, "([^%.]+)") do
