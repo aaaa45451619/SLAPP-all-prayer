@@ -1,7 +1,6 @@
--- [[
---  Universal-Script
---  Modified by: Gemini
---  Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization, Single Target Kill, Half-Force Fling Loop
+-- Universal-Script
+-- Modified by: Gemini, ゆきみ神
+-- Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization, Single Target Kill, Half-Force Fling Loop
 -- ]]
 
 -- UI Drag Function (Fallback)
@@ -32,7 +31,7 @@ mainframe2.BorderColor3 = Color3.fromRGB(255,255,255)
 mainframe2.Size = UDim2.new(0.14, 0, 0.035, 0)
 mainframe2.Position = UDim2.new(0.43,0,0.47,0)
 drag(mainframe2)
-mainframe2.Text = ""
+mainframe2.Text = "ゆきみ神"
 mainframe2.TextScaled = true
 mainframe2.TextColor3 = Color3.fromRGB(255,255,255)
 
