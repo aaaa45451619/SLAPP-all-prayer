@@ -29,10 +29,10 @@ gui2.Parent = game.CoreGui
 local mainframe2 = Instance.new("TextLabel")
 mainframe2.BackgroundColor3 = Color3.fromRGB(50,50,50)
 mainframe2.BorderColor3 = Color3.fromRGB(255,255,255)
-mainframe2.Size = UDim2.new(0.14, 0, 0.035, 0) -- 📝 サイズ変更 (0.7倍)
-mainframe2.Position = UDim2.new(0.43,0,0.47,0) -- サイズ変更に合わせて位置を調整
+mainframe2.Size = UDim2.new(0.14, 0, 0.035, 0)
+mainframe2.Position = UDim2.new(0.43,0,0.47,0)
 drag(mainframe2)
-mainframe2.Text = "ゆきみ"
+mainframe2.Text = ""
 mainframe2.TextScaled = true
 mainframe2.TextColor3 = Color3.fromRGB(255,255,255)
 
@@ -290,7 +290,7 @@ end)
 local tpBtn = Instance.new("TextButton")
 tpBtn.Size = UDim2.new(1,0,1.4,0)
 tpBtn.Position = UDim2.new(0,0,1 + 1.4*6,0)
-tpBtn.Text = "TPフリング"
+tpBtn.Text = "TPFling"
 tpBtn.TextScaled = true
 tpBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
 tpBtn.TextColor3 = Color3.fromRGB(255,255,255)
@@ -334,7 +334,7 @@ barrierPart.Parent = workspace
 local barrierBtn = Instance.new("TextButton")
 barrierBtn.Size = UDim2.new(1,0,1.4,0)
 barrierBtn.Position = UDim2.new(0,0,1 + 1.4*7,0)
-barrierBtn.Text = "近づき防止バリア: OFF"
+barrierBtn.Text = "Barrier: OFF"
 barrierBtn.TextScaled = true
 barrierBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
 barrierBtn.TextColor3 = Color3.fromRGB(255,255,255)
@@ -343,7 +343,7 @@ barrierBtn.Parent = mainframe2
 
 barrierBtn.MouseButton1Click:Connect(function()
     barrierOn = not barrierOn
-    barrierBtn.Text = "近づき防止バリア: " .. (barrierOn and "ON" or "OFF")
+    barrierBtn.Text = "Barrier: " .. (barrierOn and "ON" or "OFF")
 end)
 
 -- Barrier Logic Loop
@@ -368,11 +368,11 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
--- ホワイトリスト入力ボックス
+-- 
 local whitelistTextbox = Instance.new("TextBox")
 whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*8,0)
 whitelistTextbox.Size = UDim2.new(1,0,1.4,0)
-whitelistTextbox.PlaceholderText = "Whitelist Players ('.'で区切る)"
+whitelistTextbox.PlaceholderText = "Whitelist Players ('.' separates)"
 whitelistTextbox.TextScaled = true
 whitelistTextbox.TextColor3 = Color3.fromRGB(0,0,0)
 whitelistTextbox.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -380,7 +380,7 @@ whitelistTextbox.BorderColor3 = Color3.fromRGB(0,0,0)
 whitelistTextbox.ClearTextOnFocus = false
 whitelistTextbox.Parent = mainframe2
 
--- テキスト更新時にホワイトリスト更新
+-- 
 whitelistTextbox:GetPropertyChangedSignal("Text"):Connect(function()
     whitelistPlayers = {}
     for name in string.gmatch(whitelistTextbox.Text, "([^%.]+)") do
@@ -390,7 +390,7 @@ end)
 
 -- UI Minimization
 local isMinimized = false
-local originalSize = UDim2.new(0.07, 0, 0.245, 0) -- 📝 サイズ変更 (0.7倍)
+local originalSize = UDim2.new(0.07, 0, 0.245, 0)
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Position = UDim2.new(1, -20, 0, 0)
 minimizeButton.Size = UDim2.new(0, 20, 1, 0)
@@ -412,7 +412,7 @@ minimizeButton.MouseButton1Click:Connect(function()
                 child.Visible = false
             end
         end
-        mainframe2.Size = UDim2.new(0.07, 0, 0.035, 0) -- 📝 サイズ変更 (0.7倍)
+        mainframe2.Size = UDim2.new(0.07, 0, 0.035, 0)
         minimizeButton.Text = "+"
     else
         for _, child in pairs(mainframe2:GetChildren()) do
