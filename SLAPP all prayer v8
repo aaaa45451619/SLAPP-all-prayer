@@ -1,6 +1,6 @@
 -- Universal-Script
 -- Modified by: Gemini, ゆきみ神
--- Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization, Single Target Kill, Half-Force Fling Loop
+-- Features: Anti-slap/fling, Kill All, Fling All, Loop Fling, TP Fling, Barrier, Whitelist, Multiple Target, UI minimization, Single Target Kill
 -- ]]
 
 -- UI Drag Function (Fallback)
@@ -448,54 +448,9 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
--- Half-Force Fling Loop
-local isHalfFlinging = false
-local halfFlingThread = nil
-
-local halfFlingBtn = Instance.new("TextButton")
-halfFlingBtn.Size = UDim2.new(1, 0, 1.4, 0)
-halfFlingBtn.Position = UDim2.new(0, 0, 1 + 1.4*9, 0)
-halfFlingBtn.Text = "Half-Force Fling: OFF"
-halfFlingBtn.TextScaled = true
-halfFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-halfFlingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-halfFlingBtn.BorderColor3 = Color3.fromRGB(255, 255, 255)
-halfFlingBtn.Parent = mainframe2
-
-halfFlingBtn.MouseButton1Click:Connect(function()
-    isHalfFlinging = not isHalfFlinging
-    if isHalfFlinging then
-        halfFlingBtn.Text = "Half-Force Fling: ON"
-        local glove, event = getglove()
-        local targetNames = getTargetPlayers(textbox.Text)
-
-        if event and #targetNames > 0 then
-            halfFlingThread = coroutine.wrap(function()
-                while isHalfFlinging do
-                    for _, name in pairs(targetNames) do
-                        local targetPlayer = findTargetPlayer(name)
-                        if targetPlayer and not isWhitelisted(targetPlayer) and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            event:FireServer("slash", targetPlayer.Character, Vector3.new(0, tonumber("inf")/2, 0))
-                        end
-                    end
-                    task.wait(0.1)
-                end
-            end)()
-        else
-            isHalfFlinging = false
-            halfFlingBtn.Text = "Half-Force Fling: OFF"
-        end
-    else
-        halfFlingBtn.Text = "Half-Force Fling: OFF"
-        if halfFlingThread then
-            halfFlingThread = nil
-        end
-    end
-end)
-
 -- Whitelist Textbox
 local whitelistTextbox = Instance.new("TextBox")
-whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*10,0)
+whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*9,0)
 whitelistTextbox.Size = UDim2.new(1,0,1.4,0)
 whitelistTextbox.PlaceholderText = "Whitelist Players ('.' separates)"
 whitelistTextbox.TextScaled = true
