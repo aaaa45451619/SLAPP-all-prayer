@@ -504,3 +504,8 @@ minimizeButton.MouseButton1Click:Connect(function()
 end)
 
 mainframe2.Parent = gui2
+
+
+pcall(function()
+    game:GetService("CoreGui").RobloxGui["CoreScripts/NetworkPause"]:Destroy()
+end)
