@@ -1,4 +1,4 @@
--- ロードチェック
+  -- ロードチェック
 if not game.Players.LocalPlayer.PlayerScripts:FindFirstChild("Loaded") then
 	local data = Instance.new("NumberValue")
 	data.Name = "Loaded"
@@ -10,10 +10,10 @@ if not game.Players.LocalPlayer.PlayerScripts:FindFirstChild("Loaded") then
 
 	-- ウィンドウの作成
 	local Window = Rayfield:CreateWindow({
-		Name = "ゆきみ神すぎる",
-		LoadingTitle = "ゆきみ神すぎる",
+		Name = "雪見だいふくのトロールタワー2の Script",
+		LoadingTitle = "雪見だいふくのトロールタワー2の Script",
 		LoadingSubtitle = "このスクリプトは神すぎます",
-		ShowText = "ゆきみ神すぎる",
+		ShowText = "雪見だいふくのトロールタワー2の Script",
 		ConfigurationSaving = {
 			Enabled = true,
 			FolderName = "Exploits",
