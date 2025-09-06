@@ -192,9 +192,56 @@ textbutton3.MouseButton1Click:Connect(function()
     end
 end)
 
+-- TP Touch Button
+local loopTouching = false
+local tpTouchBtn = Instance.new("TextButton")
+tpTouchBtn.Position = UDim2.new(0,0,1 + 1.4*3,0)
+tpTouchBtn.Size = UDim2.new(1,0,1.4,0)
+tpTouchBtn.Text = "みんな進めないやつ: Off"
+tpTouchBtn.TextScaled = true
+tpTouchBtn.TextColor3 = Color3.fromRGB(255,255,255)
+tpTouchBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+tpTouchBtn.BorderColor3 = Color3.fromRGB(255,255,255)
+tpTouchBtn.Parent = mainframe2
+
+local function touchPartAsync(part)
+	local character = localplr.Character
+	if not character then return end
+	for _, bodyPart in ipairs(character:GetDescendants()) do
+		if bodyPart:IsA("BasePart") then
+			task.spawn(function()
+				firetouchinterest(bodyPart, part, 0)
+				task.wait(0.05)
+				firetouchinterest(bodyPart, part, 1)
+			end)
+		end
+	end
+end
+
+local function toggleLoopTouch()
+	loopTouching = not loopTouching
+	if loopTouching then
+        tpTouchBtn.Text = "みんな進めないやつ: ON"
+    else
+        tpTouchBtn.Text = "みんな進めないやつ: OFF"
+    end
+
+	while loopTouching do
+		for _, part in ipairs(workspace:GetDescendants()) do
+			if part:IsA("BasePart") and (part.Name == "사라지는 파트" or part.Name == "Gudock" or part.Name == "Part") then
+				touchPartAsync(part)
+			end
+		end
+		task.wait(1)
+	end
+end
+tpTouchBtn.MouseButton1Click:Connect(function()
+    toggleLoopTouch()
+end)
+
 -- Target Player Input
 local textbox = Instance.new("TextBox")
-textbox.Position = UDim2.new(0,0,1 + 1.4*3,0)
+textbox.Position = UDim2.new(0,0,1 + 1.4*4,0)
 textbox.Size = UDim2.new(1,0,1.4,0)
 textbox.PlaceholderText = "Target Player Name(s) (separate with '.')"
 textbox.TextScaled = true
@@ -214,7 +261,7 @@ end
 
 -- Fling All (Target) Button
 local flingAllTargetBtn = Instance.new("TextButton")
-flingAllTargetBtn.Position = UDim2.new(0,0,1 + 1.4*4,0)
+flingAllTargetBtn.Position = UDim2.new(0,0,1 + 1.4*5,0)
 flingAllTargetBtn.Size = UDim2.new(1,0,1.4,0)
 flingAllTargetBtn.Text = "Fling All (Target)"
 flingAllTargetBtn.TextScaled = true
@@ -247,7 +294,7 @@ end)
 
 -- 単体 Kill Button
 local singleKillBtn = Instance.new("TextButton")
-singleKillBtn.Position = UDim2.new(0,0,1 + 1.4*5,0)
+singleKillBtn.Position = UDim2.new(0,0,1 + 1.4*6,0)
 singleKillBtn.Size = UDim2.new(1,0,1.4,0)
 singleKillBtn.Text = "Kill (Target)"
 singleKillBtn.TextScaled = true
@@ -283,7 +330,7 @@ local isLoopFlinging = false
 local loopFlingThread = nil
 
 local loopFlingBtn = Instance.new("TextButton")
-loopFlingBtn.Position = UDim2.new(0, 0, 1 + 1.4*6, 0)
+loopFlingBtn.Position = UDim2.new(0, 0, 1 + 1.4*7, 0)
 loopFlingBtn.Size = UDim2.new(1, 0, 1.4, 0)
 loopFlingBtn.Text = "Loop Fling (Target): Off"
 loopFlingBtn.TextScaled = true
@@ -343,7 +390,7 @@ local tpFlingThread = nil
 
 local tpBtn = Instance.new("TextButton")
 tpBtn.Size = UDim2.new(1,0,1.4,0)
-tpBtn.Position = UDim2.new(0,0,1 + 1.4*7,0)
+tpBtn.Position = UDim2.new(0,0,1 + 1.4*8,0)
 tpBtn.Text = "TPFling: OFF"
 tpBtn.TextScaled = true
 tpBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
@@ -400,7 +447,6 @@ tpBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-
 -- Barrier Button
 local barrierOn = false
 local barrierPart = Instance.new("Part")
@@ -413,7 +459,7 @@ barrierPart.Parent = workspace
 
 local barrierBtn = Instance.new("TextButton")
 barrierBtn.Size = UDim2.new(1,0,1.4,0)
-barrierBtn.Position = UDim2.new(0,0,1 + 1.4*8,0)
+barrierBtn.Position = UDim2.new(0,0,1 + 1.4*9,0)
 barrierBtn.Text = "オーラ: OFF"
 barrierBtn.TextScaled = true
 barrierBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
@@ -450,7 +496,7 @@ end)
 
 -- Whitelist Textbox
 local whitelistTextbox = Instance.new("TextBox")
-whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*9,0)
+whitelistTextbox.Position = UDim2.new(0,0,1 + 1.4*10,0)
 whitelistTextbox.Size = UDim2.new(1,0,1.4,0)
 whitelistTextbox.PlaceholderText = "Whitelist Players ('.' separates)"
 whitelistTextbox.TextScaled = true
