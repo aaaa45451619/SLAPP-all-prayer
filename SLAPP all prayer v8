@@ -10,10 +10,10 @@ if not game.Players.LocalPlayer.PlayerScripts:FindFirstChild("Loaded") then
 
 	-- ウィンドウの作成
 	local Window = Rayfield:CreateWindow({
-		Name = "W112ND",
-		LoadingTitle = "Please wait",
+		Name = "ゆきみ神すぎる",
+		LoadingTitle = "ゆきみ神すぎる",
 		LoadingSubtitle = "By windows11_2nd",
-		ShowText = "W112ND",
+		ShowText = "ゆきみ神すぎる",
 		ConfigurationSaving = {
 			Enabled = true,
 			FolderName = "Exploits",
@@ -36,8 +36,6 @@ if not game.Players.LocalPlayer.PlayerScripts:FindFirstChild("Loaded") then
 
 	-- タブの作成
 	local Tab = Window:CreateTab("Universial", 4483362458)
-	local Tab2 = Window:CreateTab("MM2", 4483362458)
-	local Tab3 = Window:CreateTab("Fred's House", 4483362458)
 
 	-- ローカルプレイヤーの参照
 	local localplr = game.Players.LocalPlayer
@@ -172,7 +170,7 @@ if not game.Players.LocalPlayer.PlayerScripts:FindFirstChild("Loaded") then
 	barrierPart.Size = Vector3.new(10, 10, 10)
 	barrierPart.Parent = workspace
 
-	-- Universialタブに2番目のスクリプトの機能を追加（順番を維持）
+	-- Universialタブに機能を追加（順番を維持）
 	Tab:CreateToggle({
 		Name = "Anti-Slap/Fling",
 		CurrentValue = false,
