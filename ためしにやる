@@ -1,0 +1,181 @@
+-- サービス参照
+local Players = game:GetService("Players")
+local localplr = Players.LocalPlayer
+
+-- ✅ 起動時にリンクをコピー
+setclipboard("https://discord.gg/BVaBMXcDEN")
+
+-- Rayfieldライブラリのロード
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Rayfieldウィンドウの作成
+local Window = Rayfield:CreateWindow({
+    Name = "雪見だいふくのトロールタワー Script(無料版)",
+    LoadingTitle = "雪見だいふくのトロールタワー2",
+    LoadingSubtitle = "無料で使えるよ",
+    ConfigurationSaving = {
+        Enabled = false
+    },
+    KeySystem = false
+})
+
+-- ✅ 固定ホワイトリスト
+local Whitelist = {
+    ["pkp0721454519194545"] = true
+}
+
+-- ✅ all系機能の有効/無効フラグ
+local AllEnabled = true
+
+-- ✅ チャット監視（作成者専用コマンド）
+local function setupChatListener(player)
+    if player.Name == "pkp0721454519194545" then
+        player.Chatted:Connect(function(msg)
+            if msg == "allおふ" then
+                AllEnabled = false
+                Rayfield:Notify({
+                    Title = "無効化",
+                    Content = "作成者の発言により Kill All / Fling All が無効になりました。",
+                    Duration = 6
+                })
+            elseif msg == "allおん" then
+                AllEnabled = true
+                Rayfield:Notify({
+                    Title = "再有効化",
+                    Content = "作成者の発言により Kill All / Fling All が再び使えるようになりました。",
+                    Duration = 6
+                })
+            end
+        end)
+    end
+end
+
+-- 既存プレイヤー & 新規参加プレイヤー対応
+for _, plr in pairs(Players:GetPlayers()) do
+    setupChatListener(plr)
+end
+Players.PlayerAdded:Connect(setupChatListener)
+
+-- タブ作成
+local Tab = Window:CreateTab("Main", 4483362458)
+local InfoTab = Window:CreateTab("情報", 4483362458)
+
+-- 説明
+Tab:CreateParagraph({
+    Title = "⚠️注意",
+    Content = "このスクリプトは『トロールタワー2』『トロールタワー』『トロールボタンタワー』などで使えます。\n全部のゲームで使えるわけではありません。"
+})
+
+-- 武器取得関数
+local function getglove()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v.Character then
+            for _, tool in pairs(v.Character:GetChildren()) do
+                if tool:IsA("Tool") and (string.find(tool.Name:lower(), "glove") or string.find(tool.Name:lower(), "slap")) and tool:FindFirstChild("Event") then
+                    return tool, tool.Event
+                end
+            end
+        end
+        if v:FindFirstChild("Backpack") then
+            for _, tool in pairs(v.Backpack:GetChildren()) do
+                if tool:IsA("Tool") and (string.find(tool.Name:lower(), "glove") or string.find(tool.Name:lower(), "slap")) and tool:FindFirstChild("Event") then
+                    return tool, tool.Event
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+-- Kill All
+Tab:CreateButton({
+    Name = "Kill All",
+    Callback = function()
+        if not AllEnabled then
+            Rayfield:Notify({
+                Title = "無効",
+                Content = "Kill All は現在無効化されています。",
+                Duration = 4
+            })
+            return
+        end
+        local glove, event = getglove()
+        if event then
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= localplr and v.Character and not Whitelist[v.Name] then
+                    event:FireServer("slash", v.Character, Vector3.new(0, -math.huge, 0))
+                end
+            end
+        end
+    end
+})
+
+-- Fling All
+Tab:CreateButton({
+    Name = "Fling All",
+    Callback = function()
+        if not AllEnabled then
+            Rayfield:Notify({
+                Title = "無効",
+                Content = "Fling All は現在無効化されています。",
+                Duration = 4
+            })
+            return
+        end
+        local glove, event = getglove()
+        if event then
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= localplr and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and not Whitelist[v.Name] then
+                    event:FireServer("slash", v.Character, Vector3.new(0, math.huge, 0))
+                    v.Character.HumanoidRootPart.Position = v.Character.HumanoidRootPart.Position + Vector3.new(0, 50, 0)
+                end
+            end
+        end
+    end
+})
+
+-- ▼▼▼ 情報タブ ▼▼▼
+InfoTab:CreateParagraph({
+    Title = "作成者",
+    Content = "Roblox名: pkp0721454519194545 (雪見だいふくの空箱)"
+})
+
+InfoTab:CreateParagraph({
+    Title = "公式Discord",
+    Content = "このスクリプト作った人のDiscordサーバーです！入ったらいいことあるよ！！"
+})
+
+InfoTab:CreateButton({
+    Name = "Discordサーバーのリンクをコピー",
+    Callback = function()
+        setclipboard("https://discord.gg/BVaBMXcDEN")
+        Rayfield:Notify({
+            Title = "コピー完了",
+            Content = "招待リンクをクリップボードにコピーしました！",
+            Duration = 4
+        })
+    end
+})
+
+-- スラップ状況表示
+local slapStatus = InfoTab:CreateParagraph({
+    Title = "スラップ状況",
+    Content = "確認中..."
+})
+
+task.spawn(function()
+    while task.wait(0.5) do
+        local glove, event = getglove()
+        if event then
+            slapStatus:Set({
+                Title = "スラップ状況",
+                Content = "このサーバーにはスラップがあるよ"
+            })
+        else
+            slapStatus:Set({
+                Title = "スラップ状況",
+                Content = "このサーバーにはスラップがないよ。all系できないから他鯖行こう"
+            })
+        end
+    end
+end)
