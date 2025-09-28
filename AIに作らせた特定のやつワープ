@@ -1,0 +1,334 @@
+--[[
+Targeted Grab Aura - WarpGrabThenReturn (One-shot, Arrive-or-Timeout Clamp)
+・このファイルの“グラブ関数 + グラブオーラ流儀(SetNetworkOwner)”のみ使用
+・自分は 0.4 秒だけ相手の位置へワープ → 掴む（SetNetworkOwner連打）→ すぐ元の位置へ戻る
+・相手は “自分の元位置+少し上” に着くまでクランプ継続（1回で完了）
+・BodyVelocity 等の推進系は使わない
+]]
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+-- Local
+local LP = Players.LocalPlayer
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local Root = Char:WaitForChild("HumanoidRootPart")
+local Humanoid = Char:WaitForChild("Humanoid")
+LP.CharacterAdded:Connect(function(c)
+	Char = c
+	Root = c:WaitForChild("HumanoidRootPart")
+	Humanoid = c:WaitForChild("Humanoid")
+end)
+
+-- 既存（このファイルに居る想定）
+local GrabEvents = ReplicatedStorage:FindFirstChild("GrabEvents")
+local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
+-- ここは“呼ぶだけ”想定（あなたの元スクリプト実装）
+-- handleKillGrab, handleSkyGrab, handleSpinGrab, handleTeleport, handleChaosGrab,
+-- handleSupersonicGrab, handleFreezeGrab, handleNoclipGrab
+
+-- ===== Utils =====
+local function findPlayerByPartial(q)
+	if not q or q == "" then return nil end
+	q = q:lower()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LP then
+			local n = plr.Name:lower()
+			local d = (plr.DisplayName or ""):lower()
+			if n:find(q, 1, true) or d:find(q, 1, true) then
+				return plr
+			end
+		end
+	end
+	return nil
+end
+
+local function getHRP(c)
+	if not c then return nil end
+	return c:FindFirstChild("HumanoidRootPart")
+		or c:FindFirstChild("Torso")
+		or c:FindFirstChild("UpperTorso")
+end
+
+-- 正規 GrabParts 生成（GrabPart + WeldConstraint）
+local function spawnGrabModelForTarget(targetHRP)
+	local model = Instance.new("Model"); model.Name = "GrabParts"
+
+	local grabPart = Instance.new("Part")
+	grabPart.Name = "GrabPart"
+	grabPart.Size = Vector3.new(1,1,1)
+	grabPart.Massless = true
+	grabPart.CanCollide, grabPart.CanQuery, grabPart.CanTouch = false, false, false
+	grabPart.Anchored = false
+	grabPart.Transparency = 1
+	grabPart.CFrame = targetHRP.CFrame
+	grabPart.Parent = model
+	model.PrimaryPart = grabPart
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Name = "WeldConstraint"
+	weld.Part0 = grabPart
+	weld.Part1 = targetHRP
+	weld.Parent = grabPart
+
+	pcall(function() grabPart:SetNetworkOwner(LP) end)
+
+	model.Parent = Workspace
+	Debris:AddItem(model, 6)
+	return model
+end
+
+-- 競合しやすいハンドラは既定OFF（必要に応じてUIで切替可能）
+local toggleInfo = {
+	["Noclip Grab"]   = true,
+	["Freeze Grab"]   = false,
+	["Sky Grab"]      = false,
+	["Kill Grab"]     = false,
+	["Spin Grab"]     = false,
+	["Teleport Up"]   = false,
+	["Teleport Down"] = false,
+	["Chaos Grab"]    = false,
+	["Supersonic Grab"]= false,
+}
+local function runAllGrabHandlersNow(model)
+	if toggleInfo["Kill Grab"]       and handleKillGrab       then handleKillGrab(model) end
+	if toggleInfo["Sky Grab"]        and handleSkyGrab        then handleSkyGrab(model) end
+	if toggleInfo["Spin Grab"]       and handleSpinGrab       then handleSpinGrab(model) end
+	if toggleInfo["Teleport Up"]     and handleTeleport       then handleTeleport(model, "up") end
+	if toggleInfo["Teleport Down"]   and handleTeleport       then handleTeleport(model, "down") end
+	if toggleInfo["Chaos Grab"]      and handleChaosGrab      then handleChaosGrab(model, function() return toggleInfo["Chaos Grab"] end) end
+	if toggleInfo["Supersonic Grab"] and handleSupersonicGrab then handleSupersonicGrab(model) end
+	if toggleInfo["Freeze Grab"]     and handleFreezeGrab     then handleFreezeGrab(model) end
+	if toggleInfo["Noclip Grab"]     and handleNoclipGrab     then handleNoclipGrab(model) end
+end
+
+-- ===== Warp Grab（0.4秒だけ自分が相手の所へ）→ 即帰還 =====
+local WARP_DURATION   = 0.4            -- 相手のところに居る時間
+local RETURN_PADDING  = Vector3.new(0, 0, 0) -- 戻り位置の微調整（必要なら）
+
+-- “オーラ流儀のみ”で相手を自分の元位置へ寄せる：到達まで継続クランプ
+--  SetNetworkOwner を叩き続けつつ、CFrameを段階的に寄せる（BodyVelocityは不使用）
+--  引数:
+--    targetHRP : 相手のRoot
+--    goalCF    : 目標CFrame（あなたの元位置 + 少し上）
+--    opts      : { successRadius, maxSeconds, rateMin, rateMax, rateK }
+local function auraClampTargetToCFrame(targetHRP, goalCF, opts)
+	if not targetHRP then return function() end end
+	opts = opts or {}
+	local SUCCESS_RADIUS = opts.successRadius or 4.0   -- この半径以内で到達扱い
+	local MAX_CLAMP_TIME = opts.maxSeconds or 6.0      -- 安全上限（長距離でも十分）
+	local RATE_MIN = opts.rateMin or 20                -- 1秒あたりの最小追従速度
+	local RATE_MAX = opts.rateMax or 220               -- 1秒あたりの最大追従速度（安全上限）
+	local RATE_K   = opts.rateK   or 12                -- 距離比例係数（大きいほど遠距離で速い）
+
+	local alive = true
+	local startT = time()
+	local last = tick()
+	local conn
+
+	conn = RunService.Heartbeat:Connect(function()
+		if not alive or not targetHRP or not targetHRP.Parent then
+			if conn then conn:Disconnect() end
+			return
+		end
+
+		-- “グラブオーラ流儀”：所有権を毎フレームこちらへ
+		pcall(function()
+			if SetNetworkOwner then SetNetworkOwner:FireServer(targetHRP, goalCF) end
+		end)
+
+		-- 発散防止：速度を都度ゼロに戻す
+		targetHRP.AssemblyLinearVelocity  = Vector3.new()
+		targetHRP.AssemblyAngularVelocity = Vector3.new()
+
+		-- 到達判定 or タイムアウト
+		local curPos = targetHRP.Position
+		local toGoal = goalCF.Position - curPos
+		local dist = toGoal.Magnitude
+		if dist <= SUCCESS_RADIUS or (time() - startT) >= MAX_CLAMP_TIME then
+			if conn then conn:Disconnect() end
+			return
+		end
+
+		-- 距離比例の追従速度をクランプして安全に寄せる
+		local now = tick()
+		local dt = math.max(1/120, now - last); last = now
+		local followRate = math.clamp(dist * RATE_K, RATE_MIN, RATE_MAX)  -- studs/sec
+		local step = followRate * dt
+		local nextPos = (dist <= step) and goalCF.Position or (curPos + toGoal.Unit * step)
+
+		-- 向きは維持、位置だけ合わせる
+		local curCF = targetHRP.CFrame
+		targetHRP.CFrame = CFrame.new(nextPos, nextPos + curCF.LookVector)
+	end)
+
+	return function()
+		alive = false
+		if conn then conn:Disconnect() end
+	end
+end
+
+local function warpGrabThenReturn(targetPlayer)
+	if not targetPlayer or not targetPlayer.Character then return end
+	if not Root or not Root.Parent or not Humanoid then return end
+
+	local tHRP = getHRP(targetPlayer.Character); if not tHRP then return end
+
+	-- 元位置を保存
+	local originalCF = Root.CFrame + RETURN_PADDING
+
+	-- まず正規Grab生成 → 既存グラブ関数を即適用（掴み/Noclipなど）
+	local model = spawnGrabModelForTarget(tHRP)
+	runAllGrabHandlersNow(model)
+
+	-- ワープ前の自分を安定化（吹っ飛び防止）
+	local savedWalk, savedJump, savedAutoRotate = Humanoid.WalkSpeed, Humanoid.JumpPower, Humanoid.AutoRotate
+	Humanoid.AutoRotate = false
+	Humanoid.WalkSpeed  = 0
+	Humanoid.JumpPower  = 0
+	pcall(function() Humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
+	Root.AssemblyLinearVelocity  = Vector3.new()
+	Root.AssemblyAngularVelocity = Vector3.new()
+
+	-- ===== 自分を相手のところへワープ（少し後方/上）=====
+	local offset = CFrame.new(0, 2.2, -2.4)
+	Root.CFrame = tHRP.CFrame * offset
+	Root.AssemblyLinearVelocity  = Vector3.new()
+	Root.AssemblyAngularVelocity = Vector3.new()
+
+	-- ワープ中：相手を“自分の元位置付近(少し上)”へクランプ（到達まで継続）
+	local targetGoalCF = (originalCF * CFrame.new(0, 3, 0))
+	auraClampTargetToCFrame(tHRP, targetGoalCF, {
+		successRadius = 4.0,   -- 到達判定の半径
+		maxSeconds    = 6.0,   -- 長距離でも1回で寄せ切る上限時間
+		rateMin       = 140,   -- 近距離の最小速度 (20*7)
+		rateMax       = 1540,  -- 遠距離の最大速度（安全上限） (220*7)
+		rateK         = 84,    -- 距離比例係数（上げると遠距離加速） (12*7)
+	})
+
+	-- ワープ滞在 0.4 秒（所有権寄せは継続）
+	local alive = true
+	local hb
+	local deadline = time() + WARP_DURATION
+	hb = RunService.Heartbeat:Connect(function()
+		if not alive then return end
+		pcall(function()
+			if SetNetworkOwner then SetNetworkOwner:FireServer(tHRP, Root.CFrame) end
+		end)
+		if time() >= deadline then
+			alive = false
+			if hb then hb:Disconnect() end
+		end
+	end)
+
+	-- ===== 元の位置へ即帰還 =====
+	task.wait(WARP_DURATION)
+	Root.CFrame = originalCF
+	Root.AssemblyLinearVelocity  = Vector3.new()
+	Root.AssemblyAngularVelocity = Vector3.new()
+	pcall(function() Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics) end)
+
+	-- 自分の挙動を元に戻す
+	task.delay(0.05, function()
+		Humanoid.WalkSpeed  = savedWalk
+		Humanoid.JumpPower  = savedJump
+		Humanoid.AutoRotate = savedAutoRotate
+	end)
+end
+
+-- ===== エントリ：指定名のターゲットに対して“ワープ掴み→戻る” =====
+local function warpGrabEntry(targetName)
+	local target = findPlayerByPartial(targetName); if not target then return end
+	warpGrabThenReturn(target)
+end
+
+-- ====== ミニUI（テスト） ======
+local function createUI()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "WarpGrab_Test_UI"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.Parent = LP:WaitForChild("PlayerGui")
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.fromOffset(340, 156)
+	frame.Position = UDim2.fromScale(0.07, 0.32)
+	frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	frame.BorderSizePixel = 0
+	frame.Parent = gui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -40, 0, 28)
+	title.Position = UDim2.fromOffset(12, 8)
+	title.BackgroundTransparency = 1
+	title.Text = "Targeted Grab Aura - WarpGrabThenReturn"
+	title.TextColor3 = Color3.new(1,1,1)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 16
+	title.Parent = frame
+
+	-- drag
+	local drag = Instance.new("TextButton")
+	drag.Size = UDim2.fromOffset(28, 28)
+	drag.Position = UDim2.fromOffset(300, 8)
+	drag.Text = "≡"
+	drag.BackgroundTransparency = 0.2
+	drag.Parent = frame
+	Instance.new("UICorner", drag).CornerRadius = UDim.new(0, 6)
+	local dragging, dragStart, startPos
+	drag.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true; dragStart = input.Position; startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+
+	local nameBox = Instance.new("TextBox")
+	nameBox.Size = UDim2.new(1, -24, 0, 32)
+	nameBox.Position = UDim2.fromOffset(12, 44)
+	nameBox.PlaceholderText = "ターゲット名 / DisplayName（部分一致OK）"
+	nameBox.Text = ""
+	nameBox.TextSize = 14
+	nameBox.TextColor3 = Color3.new(1,1,1)
+	nameBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	nameBox.ClearTextOnFocus = false
+	nameBox.Parent = frame
+	Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+
+	local runBtn = Instance.new("TextButton")
+	runBtn.Size = UDim2.new(1, -24, 0, 36)
+	runBtn.Position = UDim2.fromOffset(12, 96)
+	runBtn.Text = "ワープ掴み→戻る（0.4秒）"
+	runBtn.TextSize = 16
+	runBtn.TextColor3 = Color3.new(1,1,1)
+	runBtn.BackgroundColor3 = Color3.fromRGB(60,110,255)
+	runBtn.Parent = frame
+	Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 8)
+
+	runBtn.MouseButton1Click:Connect(function()
+		local q = (nameBox.Text or ""):gsub("^%s*(.-)%s*$", "%1")
+		if q == "" then
+			runBtn.Text = "名前入れて！"
+			task.delay(0.6, function() runBtn.Text = "ワープ掴み→戻る（0.4秒）" end)
+			return
+		end
+		warpGrabEntry(q)
+	end)
+end
+
+createUI()
