@@ -1,6 +1,4 @@
--- AIに作らせました。by 雪見だいふくの空箱
-
--- Services
+-- ここたんのchatGPTに作らせました。ロガーだろ！とか言われるんでオープンソース
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -116,9 +114,11 @@ local function auraClampTargetToCFrame(targetHRP, goalCF, opts)
 	opts = opts or {}
 	local SUCCESS_RADIUS = opts.successRadius or 4.0   -- この半径以内で到達扱い
 	local MAX_CLAMP_TIME = opts.maxSeconds or 6.0      -- 安全上限（長距離でも十分）
-	local RATE_MIN = opts.rateMin or 20                -- 1秒あたりの最小追従速度
-	local RATE_MAX = opts.rateMax or 220               -- 1秒あたりの最大追従速度（安全上限）
-	local RATE_K   = opts.rateK   or 12                -- 距離比例係数（大きいほど遠距離で速い）
+
+	-- ★元の値の1.4倍
+	local RATE_MIN = opts.rateMin or 28                -- 20 * 1.4
+	local RATE_MAX = opts.rateMax or 308               -- 220 * 1.4
+	local RATE_K   = opts.rateK   or 16.8              -- 12  * 1.4
 
 	local alive = true
 	local startT = time()
@@ -149,7 +149,7 @@ local function auraClampTargetToCFrame(targetHRP, goalCF, opts)
 			return
 		end
 
-		-- 距離比例の追従速度をクランプして安全に寄せる
+		-- 距離比例の追従速度をクランプして安全に寄せる（1.4倍パラメタ）
 		local now = tick()
 		local dt = math.max(1/120, now - last); last = now
 		local followRate = math.clamp(dist * RATE_K, RATE_MIN, RATE_MAX)  -- studs/sec
@@ -200,10 +200,10 @@ local function warpGrabThenReturn(targetPlayer)
 	auraClampTargetToCFrame(tHRP, targetGoalCF, {
 		successRadius = 4.0,   -- 到達判定の半径
 		maxSeconds    = 6.0,   -- 長距離でも1回で寄せ切る上限時間
-		-- **プレイヤー引き寄せ速度を5倍に調整済み**
-		rateMin       = 100,
-		rateMax       = 1100,
-		rateK         = 60,
+		-- ★ここも 1.4倍パラメタで呼び出し（未指定でも上の既定が効く）
+		rateMin       = 28,
+		rateMax       = 308,
+		rateK         = 16.8,
 	})
 
 	-- ワープ滞在 0.2 秒（所有権寄せは継続）
@@ -308,7 +308,7 @@ local function createUI()
 	local runBtn = Instance.new("TextButton")
 	runBtn.Size = UDim2.new(1, -24, 0, 36)
 	runBtn.Position = UDim2.fromOffset(12, 96)
-	runBtn.Text = "ワープ掴み→戻る（0.2秒）" -- UIのテキストも修正
+	runBtn.Text = "ワープ掴み→戻る（0.2秒）"
 	runBtn.TextSize = 16
 	runBtn.TextColor3 = Color3.new(1,1,1)
 	runBtn.BackgroundColor3 = Color3.fromRGB(60,110,255)
