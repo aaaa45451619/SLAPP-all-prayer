@@ -1,10 +1,4 @@
---[[
-Targeted Grab Aura - WarpGrabThenReturn (One-shot, Arrive-or-Timeout Clamp)
-・このファイルの“グラブ関数 + グラブオーラ流儀(SetNetworkOwner)”のみ使用
-・自分は 0.4 秒だけ相手の位置へワープ → 掴む（SetNetworkOwner連打）→ すぐ元の位置へ戻る
-・相手は “自分の元位置+少し上” に着くまでクランプ継続（1回で完了）
-・BodyVelocity 等の推進系は使わない
-]]
+-- AIに作らせました。by 雪見だいふくの空箱
 
 -- Services
 local Players = game:GetService("Players")
@@ -107,8 +101,8 @@ local function runAllGrabHandlersNow(model)
 	if toggleInfo["Noclip Grab"]     and handleNoclipGrab     then handleNoclipGrab(model) end
 end
 
--- ===== Warp Grab（0.4秒だけ自分が相手の所へ）→ 即帰還 =====
-local WARP_DURATION   = 0.4            -- 相手のところに居る時間
+-- ===== Warp Grab（0.2秒だけ自分が相手の所へ）→ 即帰還 =====
+local WARP_DURATION   = 0.2            -- 相手のところに居る時間 **(修正: 0.4 -> 0.2)**
 local RETURN_PADDING  = Vector3.new(0, 0, 0) -- 戻り位置の微調整（必要なら）
 
 -- “オーラ流儀のみ”で相手を自分の元位置へ寄せる：到達まで継続クランプ
@@ -206,15 +200,16 @@ local function warpGrabThenReturn(targetPlayer)
 	auraClampTargetToCFrame(tHRP, targetGoalCF, {
 		successRadius = 4.0,   -- 到達判定の半径
 		maxSeconds    = 6.0,   -- 長距離でも1回で寄せ切る上限時間
-		rateMin       = 140,   -- 近距離の最小速度 (20*7)
-		rateMax       = 1540,  -- 遠距離の最大速度（安全上限） (220*7)
-		rateK         = 84,    -- 距離比例係数（上げると遠距離加速） (12*7)
+		-- **プレイヤー引き寄せ速度を5倍に調整済み**
+		rateMin       = 100,
+		rateMax       = 1100,
+		rateK         = 60,
 	})
 
-	-- ワープ滞在 0.4 秒（所有権寄せは継続）
+	-- ワープ滞在 0.2 秒（所有権寄せは継続）
 	local alive = true
 	local hb
-	local deadline = time() + WARP_DURATION
+	local deadline = time() + WARP_DURATION -- WARP_DURATIONは 0.2 に設定済み
 	hb = RunService.Heartbeat:Connect(function()
 		if not alive then return end
 		pcall(function()
@@ -227,7 +222,7 @@ local function warpGrabThenReturn(targetPlayer)
 	end)
 
 	-- ===== 元の位置へ即帰還 =====
-	task.wait(WARP_DURATION)
+	task.wait(WARP_DURATION) -- **(修正: 0.4 -> 0.2)**
 	Root.CFrame = originalCF
 	Root.AssemblyLinearVelocity  = Vector3.new()
 	Root.AssemblyAngularVelocity = Vector3.new()
@@ -313,7 +308,7 @@ local function createUI()
 	local runBtn = Instance.new("TextButton")
 	runBtn.Size = UDim2.new(1, -24, 0, 36)
 	runBtn.Position = UDim2.fromOffset(12, 96)
-	runBtn.Text = "ワープ掴み→戻る（0.4秒）"
+	runBtn.Text = "ワープ掴み→戻る（0.2秒）" -- UIのテキストも修正
 	runBtn.TextSize = 16
 	runBtn.TextColor3 = Color3.new(1,1,1)
 	runBtn.BackgroundColor3 = Color3.fromRGB(60,110,255)
@@ -324,7 +319,7 @@ local function createUI()
 		local q = (nameBox.Text or ""):gsub("^%s*(.-)%s*$", "%1")
 		if q == "" then
 			runBtn.Text = "名前入れて！"
-			task.delay(0.6, function() runBtn.Text = "ワープ掴み→戻る（0.4秒）" end)
+			task.delay(0.6, function() runBtn.Text = "ワープ掴み→戻る（0.2秒）" end)
 			return
 		end
 		warpGrabEntry(q)
