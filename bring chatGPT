@@ -48,8 +48,7 @@ local function lockCameraAtPosition(focusCF)
     camLockCount += 1
 
     local focusPos = focusCF.Position
-    -- 真上5スタッドから真下に見下ろす
-    local camPos   = focusPos + Vector3.new(0, 10, 0)
+    local camPos   = focusPos + Vector3.new(0, 5, 0) -- 真上5m
 
     cam.CameraType = Enum.CameraType.Scriptable
     cam.CFrame     = CFrame.new(camPos, focusPos)
@@ -238,10 +237,10 @@ end
 --================= Warp Core =================
 local RETURN_PADDING       = Vector3.new(0, 0, 0)
 local PULL_MULT            = 1.4
-local MASS_warpHoldSeconds = 0.19  -- ★ 全員ワープ掴み維持 0.19 秒固定
-local TARGET_HOLD_FIXED    = 0.20  -- ★ 単発ワープ掴み維持 0.20 秒（さっきの希望）
+local MASS_warpHoldSeconds = 0.19  -- 全員ワープ掴み維持を0.19sに固定
+local TARGET_HOLD_FIXED    = 0.20  -- 単発ワープ掴み維持0.20s
 local FRONT_OFFSET         = 2.0
-local paceSeconds          = -2.00 -- ★ 全員ワープ間隔 -2.000 固定（同フレーム複数バースト強め）
+local paceSeconds          = -2.00 -- 全員ワープ間隔-2.0s固定
 
 local function spawnGrabModelForTarget(targetHRP)
     local model = Instance.new("Model")
@@ -343,7 +342,7 @@ local function warpGrabThenReturnWithHold(targetPlayer, holdSeconds)
     Root.AssemblyLinearVelocity  = Vector3.new()
     Root.AssemblyAngularVelocity = Vector3.new()
 
-    -- カメラ固定開始（真上5m）
+    -- カメラ固定開始
     lockCameraAtPosition(originalCF)
 
     Root.CFrame = tHRP.CFrame * CFrame.new(0, 2.2, -2.4)
@@ -378,7 +377,7 @@ local function warpGrabThenReturnWithHold(targetPlayer, holdSeconds)
         Humanoid.AutoRotate = ar
     end)
 
-    -- このワープ分のカメラロック解除
+    -- カメラ解除
     releaseCamera()
 end
 
@@ -728,7 +727,7 @@ SecMass:Button({
             else
                 local i = 1
                 while i <= #others do
-                    local burst = math.clamp(2 + math.floor((-gap) * 40), 2, 64)
+                    local burst = math.clamp(2 + math.floor((-gap) * 20), 2, 16)  -- ★ 同フレーム処理上限16人に制限して負荷軽減
                     for _ = 1, burst do
                         if i > #others then
                             break
@@ -782,7 +781,7 @@ local AntiToggle = SecAnti:Toggle({
                 local ch = LP.Character
                 if ch and ch:FindFirstChild("Head") then
                     local head = ch.Head
-                    local partOwner = head:FindFirstChild("PartOwner")
+                    local partOwner = head:FindFirstChild("PartOwner") or head:FindChild("PartOwner")
                     if partOwner then
                         if Struggle then
                             pcall(function()
