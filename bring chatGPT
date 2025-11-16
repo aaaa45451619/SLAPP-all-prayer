@@ -238,10 +238,10 @@ end
 --================= Warp Core =================
 local RETURN_PADDING       = Vector3.new(0, 0, 0)
 local PULL_MULT            = 1.4
-local MASS_warpHoldSeconds = 0.18
+local MASS_warpHoldSeconds = 0.20
 local TARGET_HOLD_FIXED    = 0.30
 local FRONT_OFFSET         = 2.0
-local paceSeconds          = -1.80
+local paceSeconds          = -2.0
 
 local function spawnGrabModelForTarget(targetHRP)
     local model = Instance.new("Model")
