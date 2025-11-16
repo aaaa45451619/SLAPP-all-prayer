@@ -48,8 +48,8 @@ local function lockCameraAtPosition(focusCF)
     camLockCount += 1
 
     local focusPos = focusCF.Position
-    -- 真上5スタッドから真下に見下ろす
-    local camPos   = focusPos + Vector3.new(0, 5, 0)
+   
+    local camPos   = focusPos + Vector3.new(0, 7, 0)
 
     cam.CameraType = Enum.CameraType.Scriptable
     cam.CFrame     = CFrame.new(camPos, focusPos)
@@ -223,7 +223,7 @@ local function getPlayerRootOrSeat(player)
         return nil
     end
     local char = player.Character
-    local hrp  = getHRP(char)
+    local hrp = getHRP(char)
     if hrp and hrp:FindFirstChildOfClass("WeldConstraint") == nil then
         return hrp
     end
@@ -343,7 +343,7 @@ local function warpGrabThenReturnWithHold(targetPlayer, holdSeconds)
     Root.AssemblyLinearVelocity  = Vector3.new()
     Root.AssemblyAngularVelocity = Vector3.new()
 
-    -- カメラ固定開始（真上5m）
+    -- カメラ固定開始（真上2m）
     lockCameraAtPosition(originalCF)
 
     Root.CFrame = tHRP.CFrame * CFrame.new(0, 2.2, -2.4)
@@ -782,7 +782,7 @@ local AntiToggle = SecAnti:Toggle({
                 local ch = LP.Character
                 if ch and ch:FindFirstChild("Head") then
                     local head = ch.Head
-                    local partOwner = head:FindChild("PartOwner") or head:FindFirstChild("PartOwner")
+                    local partOwner = head:FindFirstChild("PartOwner")
                     if partOwner then
                         if Struggle then
                             pcall(function()
