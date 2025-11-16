@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris            = game:GetService("Debris")
 local Workspace         = game:GetService("Workspace")
 local UIS               = game:GetService("UserInputService")
+local TextChatService   = game:GetService("TextChatService")
 
 local LP       = Players.LocalPlayer
 local Char     = LP.Character or LP.CharacterAdded:Wait()
@@ -47,7 +48,7 @@ local function lockCameraAtPosition(focusCF)
     camLockCount += 1
 
     local focusPos = focusCF.Position
-    -- 真上20スタッドから真下に見下ろす
+    -- ★真上20スタッドから真下に見下ろす
     local camPos   = focusPos + Vector3.new(0, 20, 0)
 
     cam.CameraType = Enum.CameraType.Scriptable
@@ -240,7 +241,7 @@ local PULL_MULT            = 1.4
 local MASS_warpHoldSeconds = 0.19  -- 全員ワープ掴み時間
 local TARGET_HOLD_FIXED    = 0.20  -- 単発ワープ掴み時間
 local FRONT_OFFSET         = 2.0
-local paceSeconds          = -1.40 -- ★ここを-2.00→-1.40に変更！
+local paceSeconds          = -1.30 -- 全員ワープ間隔
 
 local function spawnGrabModelForTarget(targetHRP)
     local model = Instance.new("Model")
@@ -342,7 +343,6 @@ local function warpGrabThenReturnWithHold(targetPlayer, holdSeconds)
     Root.AssemblyLinearVelocity  = Vector3.new()
     Root.AssemblyAngularVelocity = Vector3.new()
 
-    -- カメラ固定開始（真上20m）
     lockCameraAtPosition(originalCF)
 
     Root.CFrame = tHRP.CFrame * CFrame.new(0, 2.2, -2.4)
@@ -655,7 +655,7 @@ local SecMass = Tab:Section({
 
 SecMass:Button({
     Title = "全員ワープグラブ",
-    Desc  = "ボタン一発で全員ワープ（間隔 -1.40 / 掴み 0.19 固定）",
+    Desc  = "ボタン一発で全員ワープ（間隔 -2.00 / 掴み 0.19 固定）",
     Callback = function()
         if massBusy then
             WindUI:Notify({
@@ -689,7 +689,7 @@ SecMass:Button({
             if plr ~= LP then
                 if
                     exEnabled
-                    and isPlayerInsideAnyExZone_with_snapshot(plr, zonesSnapshot)
+                    and isPlayerInsideAnyExZone_withSnapshot(plr, zonesSnapshot)
                 then
                     skippedHouse += 1
                 elseif friendExEnabled and isFriend(plr) then
@@ -726,7 +726,7 @@ SecMass:Button({
             else
                 local i = 1
                 while i <= #others do
-                    -- ★ burst: 同フレーム最大8人に制限（-1.40でもレート引っ掛けないように）
+                    -- ★ 1フレームで処理する人数をさらに抑える（最大8人）
                     local burst = math.clamp(2 + math.floor((-gap) * 10), 2, 8)
                     for _ = 1, burst do
                         if i > #others then
@@ -743,7 +743,7 @@ SecMass:Button({
             WindUI:Notify({
                 Title   = "完了",
                 Content = string.format(
-                    "実行:%d / 家スキップ:%d / フレンド:%d（間隔 %.2fs / 全員保持 %.2fs）",
+                    "実行:%d / 家スキップ:%d / フレンド:%d（間隔 %.3fs / 全員保持 %.2fs）",
                     #others,
                     skippedHouse,
                     skippedFriend,
@@ -781,7 +781,7 @@ local AntiToggle = SecAnti:Toggle({
                 local ch = LP.Character
                 if ch and ch:FindFirstChild("Head") then
                     local head = ch.Head
-                    local partOwner = head:FindFirstChild("PartOwner")
+                    local partOwner = head:FindFirstChild("PartOwner") or head:FindChild("PartOwner")
                     if partOwner then
                         if Struggle then
                             pcall(function()
