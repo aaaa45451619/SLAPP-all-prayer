@@ -1,70 +1,33 @@
--- Anti Gucci (Blobman + Orion UI)
--- ・ブロブマンを自分の1スタッド前にスポーン
--- ・イスに自動で座り続ける
--- ・座っている間ずっとラグドール連打
--- ・LocalPlayer.IsHeld を常に true にして「掴まれ状態」にする
--- ・トグルOFFしたら3秒後にブロブマンを100億スタッド上にワープ
+　-- Anti Gucci (Blobman + Orion / ラグドール必須・アンカー無し・10億ワープ)
 
--- サービス参照
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
--- Orion UI ロード（ココたん指定のやつ）
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
 
--- 状態
 local antiGucciOn = false
 local currentBlob = nil
 local spawnRemote
 local ragdollRemote
 
--- リモート取得ヘルパー
 local function GetRemotes()
-    if spawnRemote and ragdollRemote then
-        return true
-    end
-
+    if spawnRemote and ragdollRemote then return true end
     local menuToys   = ReplicatedStorage:FindFirstChild("MenuToys")
     local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
-
-    if not menuToys or not charEvents then
-        OrionLib:MakeNotification({
-            Name    = "AntiGucci",
-            Content = "MenuToys / CharacterEvents が見つからない",
-            Time    = 4
-        })
-        return false
-    end
-
+    if not menuToys or not charEvents then return false end
     spawnRemote   = menuToys:FindFirstChild("SpawnToyRemoteFunction")
     ragdollRemote = charEvents:FindFirstChild("RagdollRemote")
-
-    if not spawnRemote or not ragdollRemote then
-        OrionLib:MakeNotification({
-            Name    = "AntiGucci",
-            Content = "SpawnToyRemoteFunction / RagdollRemote が見つからない",
-            Time    = 4
-        })
-        return false
-    end
-
-    return true
+    return (spawnRemote and ragdollRemote) ~= nil
 end
 
--- Anti Gucci ON
 local function StartAntiGucci()
-    if antiGucciOn then
-        return
-    end
-    if not GetRemotes() then
-        return
-    end
+    if antiGucciOn then return end
+    if not GetRemotes() then return end
     antiGucciOn = true
 
-    -- 自分のキャラ取得
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid  = character:WaitForChild("Humanoid")
     local hrp       = character:WaitForChild("HumanoidRootPart")
@@ -78,40 +41,35 @@ local function StartAntiGucci()
     local blob       = toysFolder:WaitForChild("CreatureBlobman")
     currentBlob      = blob
 
-    -- ネットワークオーナーを自分にしておく（アンカーはしない）
+    -- ネットワークオーナーだけ自分に
     for _, part in ipairs(blob:GetDescendants()) do
         if part:IsA("BasePart") then
-            pcall(function()
-                part:SetNetworkOwner(LocalPlayer)
-            end)
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
         end
     end
 
     local seat = blob:WaitForChild("VehicleSeat")
 
-    -- イスに座らせ続けるループ
+    -- 一度だけ座らせる
     task.spawn(function()
-        while antiGucciOn and currentBlob == blob do
-            if humanoid.Parent and humanoid.SeatPart ~= seat then
-                seat:Sit(humanoid)
-            end
-            task.wait(0.1)
+        if humanoid and humanoid.Parent then
+            seat:Sit(humanoid)
         end
     end)
 
-    -- 座っている間ラグドール連打（ラグドールがないとアンチグッチ効かない想定）
+    -- ラグドール連打（ラグドール必須なので常時撃つ）
     task.spawn(function()
         while antiGucciOn and currentBlob == blob do
-            if humanoid.Parent and humanoid.SeatPart == seat then
+            if humanoid.Parent then
                 for _ = 1, 12 do
                     ragdollRemote:FireServer(hrp, 0)
                 end
             end
-            task.wait(0.2)  -- 重かったら間隔を大きくして調整
+            task.wait(0.2) -- 重ければここを大きく
         end
     end)
 
-    -- IsHeld を常に true にして「掴まれ中」にする
+    -- IsHeld を常に true
     task.spawn(function()
         while antiGucciOn and currentBlob == blob do
             pcall(function()
@@ -125,33 +83,14 @@ local function StartAntiGucci()
     end)
 end
 
--- Anti Gucci OFF ＋ 3秒後にブロブマン100億上ワープ
-local function StopAntiGucci()
-    if not antiGucciOn then
-        return
-    end
-    antiGucciOn = false
-
-    local blob = currentBlob
-    currentBlob = nil
-    if not blob or not blob.Parent then
-        return
-    end
-
-    -- 3秒待ってからワープ（その間に位置を確定させるイメージ）
-    task.delay(3, function()
-        if not blob or not blob.Parent then
-            return
-        end
-
+local function WarpBlobUpAfterDelay(blob, delaySeconds)
+    task.delay(delaySeconds, function()
+        if not blob or not blob.Parent then return end
         local character = LocalPlayer.Character
         local hrp = character and character:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            return
-        end
+        if not hrp then return end
 
-        -- 100億スタッド上へワープ
-        local targetPos = hrp.Position + Vector3.new(0, 10000000000, 0)
+        local targetPos = hrp.Position + Vector3.new(0, 1000000000, 0) -- 10億上
 
         if blob.PrimaryPart then
             pcall(function()
@@ -166,42 +105,4 @@ local function StopAntiGucci()
                 local ok, cf = pcall(function()
                     return blob:GetModelCFrame()
                 end)
-                origin = ok and cf.Position or blob:GetChildren()[1].Position
-            end
-
-            for _, part in ipairs(blob:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    local offset = part.Position - origin
-                    part.Position = targetPos + offset
-                end
-            end
-        end
-    end)
-end
-
---=== Orion UI セットアップ ===--
-local window = OrionLib:MakeWindow({
-    Name        = "Anti-Gucci Test",
-    HidePremium = true,
-    SaveConfig  = false
-})
-
-local mainTab = window:MakeTab({
-    Name        = "Main",
-    Icon        = "rbxassetid://7733960981",
-    PremiumOnly = false
-})
-
-mainTab:AddToggle({
-    Name    = "Anti Gucci 起動",
-    Default = false,
-    Callback = function(value)
-        if value then
-            StartAntiGucci()
-        else
-            StopAntiGucci()
-        end
-    end
-})
-
-OrionLib:Init()
+                origin
