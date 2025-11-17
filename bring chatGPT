@@ -241,7 +241,7 @@ local PULL_MULT            = 1.4
 local MASS_warpHoldSeconds = 0.19  -- 全員ワープ掴み時間
 local TARGET_HOLD_FIXED    = 0.20  -- 単発ワープ掴み時間
 local FRONT_OFFSET         = 2.0
-local paceSeconds          = -1.30 -- 全員ワープ間隔
+local paceSeconds          = -1.10 -- 全員ワープ間隔
 
 local function spawnGrabModelForTarget(targetHRP)
     local model = Instance.new("Model")
