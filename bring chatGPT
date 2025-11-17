@@ -1,5 +1,6 @@
 -- Orion UI ライブラリを読み込み
-local OrionLib = loadstring(game:HttpGet("https://github.com/VerbalHubz/Verbal-Hub/raw/refs/heads/main/Orion%20Hub%20Ui%20V3"))()
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/src/Orion.lua"))()
+
 -- 必要なサービス・変数
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,27 +14,26 @@ local SpawnRemote = MenuToys:WaitForChild("SpawnToyRemoteFunction")
 local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
 local RagdollRemote   = CharacterEvents:WaitForChild("RagdollRemote")
 
--- 処理用フラグ
 local antiGucciOn = false
-local blobTasks   = {} -- タスクを格納してあとで停止する用
+local blobTasks   = {}
+local currentBlob = nil  -- ★トグルOFF時に飛ばす対象を保持するための変数
 
--- Blobmanを召喚・上空へ飛ばす処理
+-- Blobman を召喚・拘束処理を開始する関数
 local function startAntiGucci()
     if antiGucciOn then return end
     antiGucciOn = true
 
-    -- 座る前の位置を記憶
     local originalCF = HRP.CFrame
 
-    -- 5スタッド前にBlobmanをスポーン
+    -- 5スタッド前に Blobman をスポーン
     local spawnCF = HRP.CFrame * CFrame.new(0, 0, -5)
     SpawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
-    -- Blobman読み込み
     local toysFolder = workspace:WaitForChild(LocalPlayer.Name.."SpawnedInToys")
     local Blob = toysFolder:WaitForChild("CreatureBlobman")
+    currentBlob = Blob  -- ★後で飛ばすために保存
 
-    -- 全パーツを固定し、ネットワークオーナーを自分に
+    -- 全パーツを固定＆ネットワークオーナーを自分に設定
     for _, part in pairs(Blob:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Anchored = true
@@ -43,8 +43,7 @@ local function startAntiGucci()
 
     local Seat = Blob:WaitForChild("VehicleSeat")
 
-    -- 以降、複数の処理をタスクとして保持
-    -- 自動で座る
+    -- 各処理をタスクとして登録
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             if Seat.Occupant ~= Humanoid then
@@ -54,7 +53,6 @@ local function startAntiGucci()
         end
     end))
 
-    -- 座ったら元の位置に戻す
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             if Humanoid.SeatPart == Seat then
@@ -64,7 +62,6 @@ local function startAntiGucci()
         end
     end))
 
-    -- 拘束状態維持
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             pcall(function() LocalPlayer.IsHeld.Value = true end)
@@ -72,7 +69,6 @@ local function startAntiGucci()
         end
     end))
 
-    -- ラグドール連打
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             for _ = 1, 12 do
@@ -81,43 +77,47 @@ local function startAntiGucci()
             task.wait()
         end
     end))
-
-    -- 少し待ってからBlobmanを1億スタッド上へ
-    task.spawn(function()
-        task.wait(1)
-        local targetPos = HRP.Position + Vector3.new(0, 100000000, 0)
-        if Blob.PrimaryPart then
-            Blob:PivotTo(CFrame.new(targetPos))
-        else
-            -- PrimaryPart がない場合は座席を基準に各パーツを移動
-            local origin = Seat.Position
-            for _, part in pairs(Blob:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    local offset = part.Position - origin
-                    part.Position = targetPos + offset
-                end
-            end
-        end
-    end)
 end
 
--- 停止処理
+-- トグルOFFで全処理停止＋上空へ飛ばす関数
 local function stopAntiGucci()
+    if not antiGucciOn then return end
     antiGucciOn = false
-    -- 登録したタスクを停止
+
+    -- 進行中のタスクを停止
     for _, t in ipairs(blobTasks) do
         if typeof(t) == "thread" then
             pcall(function() task.cancel(t) end)
         end
     end
     blobTasks = {}
+
+    -- ★ネットワークオーナーの権限を利用して上空1億スタッドへ移動
+    if currentBlob and currentBlob.Parent then
+        local targetPos = HRP.Position + Vector3.new(0, 100000000, 0)
+        if currentBlob.PrimaryPart then
+            currentBlob:PivotTo(CFrame.new(targetPos))
+        else
+            -- PrimaryPart がない場合は各パーツを同じオフセットで移動
+            local seat = currentBlob:FindFirstChild("VehicleSeat") or currentBlob:FindFirstChildWhichIsA("VehicleSeat")
+            local origin = seat and seat.Position or currentBlob:GetModelCFrame().Position
+            for _, part in pairs(currentBlob:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local offset = part.Position - origin
+                    part.Position = targetPos + offset
+                end
+            end
+        end
+    end
+
+    currentBlob = nil
 end
 
--- Orion UIのウィンドウとタブを作成
-local Window = OrionLib:MakeWindow({Name = "Anti-Gucci Tool (Orion)", HidePremium = false, SaveConfig = false})
-local Tab    = Window:MakeTab({Name = "Main", Icon = "rbxassetid://7733960981", PremiumOnly = false})
+-- Orion UI セットアップ
+local Window = OrionLib:MakeWindow({Name="Anti-Gucci Tool (Orion)", HidePremium=false, SaveConfig=false})
+local Tab    = Window:MakeTab({Name="Main", Icon="rbxassetid://7733960981", PremiumOnly=false})
 
--- トグルを追加
+-- トグル UI
 Tab:AddToggle({
     Name = "アンチぐっち起動",
     Default = false,
@@ -130,5 +130,4 @@ Tab:AddToggle({
     end
 })
 
--- UI起動
 OrionLib:Init()
