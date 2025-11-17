@@ -1,4 +1,4 @@
---=== Anti Gucci (Blobman + Orion / アンカー無し版) ===--
+-- Anti Gucci (Blobman + Orion / ラグドール必須・アンカー無し・10億ワープ)
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,36 +6,19 @@ local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
--- ココたん指定の Orion ローダー
+-- ココたん指定の Orion UI
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
 
 local antiGucciOn = false
 local currentBlob = nil
 
--- Remotes を安全に取得
 local function getRemotes()
     local menuToys    = ReplicatedStorage:FindFirstChild("MenuToys")
     local charEvents  = ReplicatedStorage:FindFirstChild("CharacterEvents")
-    if not menuToys or not charEvents then
-        OrionLib:MakeNotification({
-            Name    = "Error",
-            Content = "MenuToys / CharacterEvents が見つからない",
-            Time    = 5
-        })
-        return nil
-    end
-
-    local spawnRemote = menuToys:FindFirstChild("SpawnToyRemoteFunction")
+    if not menuToys or not charEvents then return end
+    local spawnRemote   = menuToys:FindFirstChild("SpawnToyRemoteFunction")
     local ragdollRemote = charEvents:FindFirstChild("RagdollRemote")
-    if not spawnRemote or not ragdollRemote then
-        OrionLib:MakeNotification({
-            Name    = "Error",
-            Content = "SpawnToyRemoteFunction / RagdollRemote が見つからない",
-            Time    = 5
-        })
-        return nil
-    end
-
+    if not spawnRemote or not ragdollRemote then return end
     return spawnRemote, ragdollRemote
 end
 
@@ -53,16 +36,16 @@ local function startAntiGucci()
     local Humanoid  = Character:WaitForChild("Humanoid")
     local HRP       = Character:WaitForChild("HumanoidRootPart")
 
-    -- 1スタッド前に Blobman スポーン（アンカーはしない）
+    -- ブロブマンを1スタッド前にスポーン
     local spawnCF = HRP.CFrame * CFrame.new(0, 0, -1)
     spawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
-    -- Blobman 読み込み
+    -- ブロブマン取得
     local toysFolder = Workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
     local Blob       = toysFolder:WaitForChild("CreatureBlobman")
     currentBlob      = Blob
 
-    -- 任意：ネットワークオーナーは自分にしておく（アンカーはしない）
+    -- ネットワークオーナーだけ自分にしておく（アンカーはしない）
     for _, part in ipairs(Blob:GetDescendants()) do
         if part:IsA("BasePart") then
             pcall(function()
@@ -83,17 +66,17 @@ local function startAntiGucci()
         end
     end)
 
-    -- 常時ラグドール化（Gucci判定向け）
+    -- ラグドール連打（ラグドールが無いと anti Gucci 効かない想定なので常時撃つ）
     task.spawn(function()
         while antiGucciOn and currentBlob == Blob do
             for _ = 1, 12 do
                 ragdollRemote:FireServer(HRP, 0)
             end
-            task.wait(0.2) -- 連打間隔。重いようなら数字を大きく
+            task.wait(0.2) -- 重かったらここを大きくする
         end
     end)
 
-    -- IsHeld を常に true にして「掴まれ状態」を維持
+    -- 常に IsHeld = true にして「掴まれている」状態にする
     task.spawn(function()
         while antiGucciOn and currentBlob == Blob do
             pcall(function()
@@ -113,11 +96,11 @@ local function warpBlobUp()
     end
 
     local Character = LocalPlayer.Character
-    local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
+    local HRP = Character and Character:WaitForChild("HumanoidRootPart", 1)
     if not HRP then return end
 
-    -- 自分の位置から100億スタッド上にワープ
-    local targetPos = HRP.Position + Vector3.new(0, 10000000000, 0)
+    -- 10億スタッド上へワープ
+    local targetPos = HRP.Position + Vector3.new(0, 1000000000, 0)
 
     if currentBlob.PrimaryPart then
         pcall(function()
@@ -168,8 +151,8 @@ local Tab = Window:MakeTab({
 Tab:AddToggle({
     Name    = "Anti Gucci 起動",
     Default = false,
-    Callback = function(v)
-        if v then
+    Callback = function(value)
+        if value then
             startAntiGucci()
         else
             stopAntiGucci()
