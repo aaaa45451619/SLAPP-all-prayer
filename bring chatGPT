@@ -1,960 +1,134 @@
-local WindUI = loadstring(game:HttpGet(
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
-
+-- Orion UI ライブラリを読み込み
+local OrionLib = loadstring(game:HttpGet("https://github.com/VerbalHubz/Verbal-Hub/raw/refs/heads/main/Orion%20Hub%20Ui%20V3"))()
+-- 必要なサービス・変数
 local Players           = game:GetService("Players")
-local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Debris            = game:GetService("Debris")
-local Workspace         = game:GetService("Workspace")
-local UIS               = game:GetService("UserInputService")
-local TextChatService   = game:GetService("TextChatService")
-
-local LP       = Players.LocalPlayer
-local Char     = LP.Character or LP.CharacterAdded:Wait()
-local Root     = Char:WaitForChild("HumanoidRootPart")
-local Humanoid = Char:WaitForChild("Humanoid")
-
-LP.CharacterAdded:Connect(function(c)
-    Char = c
-    Root = c:WaitForChild("HumanoidRootPart")
-    Humanoid = c:WaitForChild("Humanoid")
-end)
-
-local GrabEvents      = ReplicatedStorage:FindFirstChild("GrabEvents")
-local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
-local Struggle        = ReplicatedStorage:FindFirstChild("Struggle")
-
---================= カメラ制御 =================
-local camLockCount    = 0
-local savedCamType    = nil
-local savedCamSubject = nil
-local savedCamCFrame  = nil
-
-local function getCamera()
-    return Workspace.CurrentCamera
-end
-
-local function lockCameraAtPosition(focusCF)
-    local cam = getCamera()
-    if not cam then
-        return
-    end
-    if camLockCount == 0 then
-        savedCamType    = cam.CameraType
-        savedCamSubject = cam.CameraSubject
-        savedCamCFrame  = cam.CFrame
-    end
-    camLockCount += 1
-
-    local focusPos = focusCF.Position
-    -- ★真上20スタッドから真下に見下ろす
-    local camPos   = focusPos + Vector3.new(0, 20, 0)
-
-    cam.CameraType = Enum.CameraType.Scriptable
-    cam.CFrame     = CFrame.new(camPos, focusPos)
-end
-
-local function releaseCamera()
-    local cam = getCamera()
-    if not cam then
-        camLockCount = 0
-        return
-    end
-    if camLockCount <= 0 then
-        camLockCount = 0
-        return
-    end
-    camLockCount -= 1
-    if camLockCount == 0 then
-        cam.CameraType = savedCamType or Enum.CameraType.Custom
-        if savedCamSubject then
-            cam.CameraSubject = savedCamSubject
-        end
-        if savedCamCFrame then
-            cam.CFrame = savedCamCFrame
-        end
-    end
-end
-
---================= 除外（家 / フレンド） =================
-local EX_ZONES, EX_SET = {}, {}
-local exEnabled, rescanAlive, massBusy = true, false, false
-
-local function getCFSize(inst)
-    if inst:IsA("Model") then
-        local cf, size = inst:GetBoundingBox()
-        return cf, size
-    elseif inst:IsA("BasePart") then
-        return inst.CFrame, inst.Size
-    end
-end
-
-local function clearExZones()
-    table.clear(EX_ZONES)
-    table.clear(EX_SET)
-end
-
-local function addZone(inst)
-    if not inst or EX_SET[inst] then
-        return false
-    end
-    local target = inst:IsA("Model") and inst or inst:FindFirstAncestorOfClass("Model") or inst
-    local cf, size = getCFSize(target)
-    if not cf then
-        return false
-    end
-    table.insert(EX_ZONES, { inst = target, cf = cf, size = size })
-    EX_SET[target] = true
-    return true
-end
-
-local function scanPlots()
-    if massBusy then
-        return 0
-    end
-    clearExZones()
-    local plots = Workspace:FindFirstChild("Plots")
-    if not plots then
-        return 0
-    end
-    local n = 0
-    for _, plot in ipairs(plots:GetChildren()) do
-        if plot.Name:lower():find("plot") then
-            local barrier = plot:FindFirstChild("Barrier")
-            if barrier then
-                local pb = barrier:FindFirstChild("PlotBarrier", true)
-                if addZone(pb or barrier) then
-                    n += 1
-                end
-            end
-        end
-    end
-    return n
-end
-
-local function pointInsideOBB(worldPoint, cf, size)
-    local p = cf:PointToObjectSpace(worldPoint)
-    return math.abs(p.X) <= size.X / 2
-        and math.abs(p.Y) <= size.Y / 2
-        and math.abs(p.Z) <= size.Z / 2
-end
-
-local function isPlayerInsideAnyExZone_withSnapshot(player, snapshot)
-    local ch = player and player.Character
-    if not ch then
-        return false
-    end
-    local root =
-        ch:FindFirstChild("HumanoidRootPart")
-        or ch:FindFirstChild("Torso")
-        or ch:FindFirstChild("UpperTorso")
-    if not root then
-        return false
-    end
-    local pos = root.Position
-    for i = 1, #snapshot do
-        local z = snapshot[i]
-        if z.inst and z.inst.Parent and pointInsideOBB(pos, z.cf, z.size) then
-            return true
-        end
-    end
-    return false
-end
-
-local function startRescanLoop()
-    if rescanAlive then
-        return
-    end
-    rescanAlive = true
-    task.spawn(function()
-        while rescanAlive and exEnabled do
-            if not massBusy then
-                scanPlots()
-            end
-            task.wait(2.0)
-        end
-    end)
-end
-
-local function stopRescanLoop()
-    rescanAlive = false
-    clearExZones()
-end
-
-local friendExEnabled = true
-
-local function isFriend(plr)
-    local ok, res = pcall(function()
-        return LP:IsFriendsWith(plr.UserId)
-    end)
-    return ok and res or false
-end
-
---================= Utils =================
-local function findPlayerByPartial(q)
-    if not q or q == "" then
-        return nil
-    end
-    q = q:lower()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP then
-            local n = plr.Name:lower()
-            local d = (plr.DisplayName or ""):lower()
-            if n:find(q, 1, true) or d:find(q, 1, true) then
-                return plr
-            end
-        end
-    end
-    return nil
-end
-
-local function getHRP(c)
-    if not c then
-        return nil
-    end
-    return c:FindFirstChild("HumanoidRootPart")
-        or c:FindFirstChild("Torso")
-        or c:FindFirstChild("UpperTorso")
-end
-
-local function getPlayerRootOrSeat(player)
-    if not player or not player.Character then
-        return nil
-    end
-    local char = player.Character
-    local hrp  = getHRP(char)
-    if hrp and hrp:FindFirstChildOfClass("WeldConstraint") == nil then
-        return hrp
-    end
-    for _, seat in ipairs(Workspace:GetDescendants()) do
-        if seat:IsA("VehicleSeat") and seat.Occupant and seat.Occupant.Parent == char then
-            return seat
-        end
-    end
-    return hrp
-end
-
---================= Warp Core =================
-local RETURN_PADDING       = Vector3.new(0, 0, 0)
-local PULL_MULT            = 1.4
-local MASS_warpHoldSeconds = 0.2１  -- 全員ワープ掴み時間
-local TARGET_HOLD_FIXED    = 0.20  -- 単発ワープ掴み時間
-local FRONT_OFFSET         = 2.0
-local paceSeconds          = -1.10 -- 全員ワープ間隔
-
-local function spawnGrabModelForTarget(targetHRP)
-    local model = Instance.new("Model")
-    model.Name = "GrabParts"
-    local grabPart = Instance.new("Part")
-    grabPart.Name = "GrabPart"
-    grabPart.Size = Vector3.new(1, 1, 1)
-    grabPart.Massless = true
-    grabPart.CanCollide = false
-    grabPart.CanQuery  = false
-    grabPart.CanTouch  = false
-    grabPart.Anchored  = false
-    grabPart.Transparency = 1
-    grabPart.CFrame    = targetHRP.CFrame
-    grabPart.Parent    = model
-    model.PrimaryPart  = grabPart
-    local weld = Instance.new("WeldConstraint")
-    weld.Part0 = grabPart
-    weld.Part1 = targetHRP
-    weld.Parent = grabPart
-    pcall(function()
-        grabPart:SetNetworkOwner(LP)
-    end)
-    model.Parent = Workspace
-    Debris:AddItem(model, 6)
-    return model
-end
-
-local function auraClampTargetToCFrame(targetHRP, goalCF)
-    if not targetHRP then
-        return
-    end
-    local startT = time()
-    local last = tick()
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if not targetHRP or not targetHRP.Parent then
-            if conn then
-                conn:Disconnect()
-            end
-            return
-        end
-        pcall(function()
-            if SetNetworkOwner then
-                SetNetworkOwner:FireServer(targetHRP, goalCF)
-            end
-        end)
-        targetHRP.AssemblyLinearVelocity  = Vector3.new()
-        targetHRP.AssemblyAngularVelocity = Vector3.new()
-        local curPos = targetHRP.Position
-        local toGoal = goalCF.Position - curPos
-        local dist   = toGoal.Magnitude
-        if dist <= 4 or (time() - startT) >= 6 then
-            if conn then
-                conn:Disconnect()
-            end
-            return
-        end
-        local now = tick()
-        local dt  = math.max(1 / (120 * PULL_MULT), now - last)
-        last      = now
-        local rate = math.clamp(dist * 90 * PULL_MULT, 120 * PULL_MULT, 1600 * PULL_MULT)
-        local step = rate * dt
-        local nextPos = (dist <= step)
-            and goalCF.Position
-            or (curPos + toGoal.Unit * step)
-        local curCF = targetHRP.CFrame
-        targetHRP.CFrame = CFrame.new(nextPos, nextPos + curCF.LookVector)
-    end)
-end
-
-local function warpGrabThenReturnWithHold(targetPlayer, holdSeconds)
-    if not targetPlayer or not targetPlayer.Character then
-        return
-    end
-    if not Root or not Root.Parent or not Humanoid then
-        return
-    end
-    local tHRP = getPlayerRootOrSeat(targetPlayer)
-    if not tHRP then
-        return
-    end
-
-    local originalCF = Root.CFrame + RETURN_PADDING
-
-    spawnGrabModelForTarget(tHRP)
-
-    local w  = Humanoid.WalkSpeed
-    local j  = Humanoid.JumpPower
-    local ar = Humanoid.AutoRotate
-
-    Humanoid.AutoRotate = false
-    Humanoid.WalkSpeed  = 0
-    Humanoid.JumpPower  = 0
-    pcall(function()
-        Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-    end)
-
-    Root.AssemblyLinearVelocity  = Vector3.new()
-    Root.AssemblyAngularVelocity = Vector3.new()
-
-    lockCameraAtPosition(originalCF)
-
-    Root.CFrame = tHRP.CFrame * CFrame.new(0, 2.2, -2.4)
-
-    local targetGoalCF = originalCF * CFrame.new(0, 0, -FRONT_OFFSET)
-    auraClampTargetToCFrame(tHRP, targetGoalCF)
-
-    local holdT    = math.max(0.0, tonumber(holdSeconds) or 0.3)
-    local deadline = time() + holdT
-
-    local hb
-    hb = RunService.Heartbeat:Connect(function()
-        if time() >= deadline and hb then
-            hb:Disconnect()
-        end
-        pcall(function()
-            if SetNetworkOwner then
-                SetNetworkOwner:FireServer(tHRP, Root.CFrame)
-            end
-        end)
-    end)
-
-    task.wait(holdT)
-
-    Root.CFrame = originalCF
-    pcall(function()
-        Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-    end)
-    task.delay(0.05, function()
-        Humanoid.WalkSpeed  = w
-        Humanoid.JumpPower  = j
-        Humanoid.AutoRotate = ar
-    end)
-
-    releaseCamera()
-end
-
-local function warpGrabEntry_TargetFixed(namePart)
-    local t = findPlayerByPartial(namePart)
-    if not t then
-        return
-    end
-    warpGrabThenReturnWithHold(t, TARGET_HOLD_FIXED)
-end
-
-local function warpGrabEntry_Mass(targetPlayer)
-    warpGrabThenReturnWithHold(targetPlayer, MASS_warpHoldSeconds)
-end
-
---================= WindUI: Window / Tab =================
-local Window = WindUI:CreateWindow({
-    Title     = "雪見だいふくの空箱自己満スクリプト",
-    Icon      = "lucide:target",
-    Theme     = "Dark",
-    Resizable = true,
-    Folder    = "WarpGrab",
-})
-
-local Tab = Window:Tab({
-    Title = "WarpGrab",
-    Icon  = "lucide:bolt",
-})
-
-local ConfigManager = Window.ConfigManager
-local myConfig      = ConfigManager:CreateConfig("warp_grab")
-
-local function AutoSave()
-    task.delay(0.05, function()
-        pcall(function()
-            myConfig:Save()
-        end)
-    end)
-end
-
---================= ターゲット指定 =================
-local SecTarget = Tab:Section({
-    Title  = "ターゲット指定",
-    Opened = true,
-})
-
-local typedName = ""
-local nameInputBoxRef
-
-local NameInput = SecTarget:Input({
-    Title       = "ターゲット名部分一致",
-    Desc        = "例: yu, coco など",
-    Value       = "",
-    InputIcon   = "lucide:user",
-    Placeholder = "名前の一部を入力",
-    Type        = "Input",
-    Callback    = function(val)
-        typedName = tostring(val or "")
-    end,
-})
-
-UIS.TextBoxFocused:Connect(function(tb)
-    if tb
-        and tb:IsA("TextBox")
-        and tb.PlaceholderText == "名前の一部を入力"
-    then
-        nameInputBoxRef = tb
-        pcall(function()
-            tb.ClearTextOnFocus = true
-        end)
-        tb.Text = ""
-        typedName = ""
-    end
-end)
-
-do
-    local lastRun = 0
-    UIS.TextBoxFocusReleased:Connect(function(tb)
-        if tb ~= nameInputBoxRef then
-            return
-        end
-        local q = (typedName or ""):gsub("^%s*(.-)%s*$", "%1")
-        if tick() - lastRun < 0.12 or q == "" then
-            return
-        end
-        lastRun = tick()
-        nameInputBoxRef = nil
-        warpGrabEntry_TargetFixed(q)
-        WindUI:Notify({
-            Title    = "ターゲット実行",
-            Content  = ("固定0.20s / " .. q),
-            Duration = 1.0,
-            Icon     = "lucide:zap",
-        })
-    end)
-end
-
-local playerOptions, labelToName = {}, {}
-local selectedLabel
-local Dropdown
-
-local function buildPlayerOptions()
-    local opts, map = {}, {}
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP then
-            local label = string.format(
-                "%s (@%s)",
-                plr.DisplayName or plr.Name,
-                plr.Name
-            )
-            table.insert(opts, label)
-            map[label] = plr.Name
-        end
-    end
-    table.sort(opts, function(a, b)
-        return a:lower() < b:lower()
-    end)
-    return opts, map
-end
-
-playerOptions, labelToName = buildPlayerOptions()
-selectedLabel = playerOptions[1]
-
-Dropdown = SecTarget:Dropdown({
-    Title  = "プレイヤー選択",
-    Values = (#playerOptions > 0) and playerOptions or { "(他プレイヤーなし)" },
-    Value  = selectedLabel,
-    Multi  = false,
-    Callback = function(v)
-        selectedLabel = v
-    end,
-})
-
-local lastPointerDownAt = 0
-UIS.InputBegan:Connect(function(input, gpe)
-    if gpe then
-        return
-    end
-    if
-        input.UserInputType == Enum.UserInputType.MouseButton1 or
-        input.UserInputType == Enum.UserInputType.Touch
-    then
-        lastPointerDownAt = os.clock()
-    end
-end)
-
-local isDropdownOpen = false
-
-pcall(function()
-    if Dropdown.OnOpen then
-        Dropdown:OnOpen(function()
-            isDropdownOpen = true
-        end)
-    end
-    if Dropdown.OnClose then
-        Dropdown:OnClose(function()
-            isDropdownOpen = false
-        end)
-    end
-end)
-
-local refreshPending = false
-
-local function refreshDropdownSafe()
-    if refreshPending then
-        return
-    end
-    refreshPending = true
-    task.spawn(function()
-        task.wait(0.15)
-        local deadline = os.clock() + 3
-        while (os.clock() - lastPointerDownAt) < 0.8 do
-            if os.clock() > deadline then
-                break
-            end
-            task.wait(0.1)
-        end
-        local opened = false
-        local ok, res = pcall(function()
-            return
-                isDropdownOpen
-                or Dropdown.Opened
-                or Dropdown.IsOpen
-                or Dropdown._Opened
-                or (Dropdown.IsOpened and Dropdown:IsOpened())
-        end)
-        if ok and res then
-            opened = true
-        end
-        if not opened then
-            playerOptions, labelToName = buildPlayerOptions()
-            if #playerOptions == 0 then
-                Dropdown:Refresh({ "(他プレイヤーなし)" })
-                selectedLabel = nil
-            else
-                if not selectedLabel or not labelToName[selectedLabel] then
-                    selectedLabel = playerOptions[1]
-                end
-                Dropdown:Refresh(playerOptions)
-                Dropdown:Select(selectedLabel)
-            end
-        end
-        refreshPending = false
-    end)
-end
-
-Players.PlayerAdded:Connect(refreshDropdownSafe)
-Players.PlayerRemoving:Connect(refreshDropdownSafe)
-
-SecTarget:Button({
-    Title = "ターゲットワープグラブ（保持0.20s固定）",
-    Desc  = "入力 or 選択したプレイヤーへ実行",
-    Callback = function()
-        local q = (typedName or ""):gsub("^%s*(.-)%s*$", "%1")
-        if q == "" and selectedLabel and labelToName[selectedLabel] then
-            q = labelToName[selectedLabel]
-        end
-        if q == "" then
-            WindUI:Notify({
-                Title    = "入力不足",
-                Content  = "名前を入力 or 選択して",
-                Duration = 1.2,
-                Icon     = "lucide:alert-circle",
-            })
-            return
-        end
-        warpGrabEntry_TargetFixed(q)
-        WindUI:Notify({
-            Title    = "実行",
-            Content  = ("固定0.20s / " .. q),
-            Duration = 1.0,
-            Icon     = "lucide:zap",
-        })
-    end,
-})
-
---================= 除外設定 =================
-local SecEx = Tab:Section({
-    Title  = "除外設定",
-    Opened = true,
-})
-
-local ToggleExcludeHouse = SecEx:Toggle({
-    Title   = "家を除外",
-    Desc    = "Plots/Barrier/PlotBarrier を自動スキャン",
-    Type    = "Checkbox",
-    Default = true,
-    Callback = function(on)
-        exEnabled = on
-        if on then
-            scanPlots()
-            startRescanLoop()
-        else
-            stopRescanLoop()
-        end
-        AutoSave()
-    end,
-})
-
-local ToggleFriendWL = SecEx:Toggle({
-    Title   = "ホワイトフレンド",
-    Desc    = "フレンドは対象外",
-    Type    = "Checkbox",
-    Default = true,
-    Callback = function(on)
-        friendExEnabled = on
-        AutoSave()
-    end,
-})
-
---================= 全員ワープ =================
-local SecMass = Tab:Section({
-    Title  = "全員ワープ",
-    Opened = true,
-})
-
-SecMass:Button({
-    Title = "全員ワープグラブ",
-    Desc  = "ボタン一発で全員ワープ（間隔 -2.00 / 掴み 0.19 固定）",
-    Callback = function()
-        if massBusy then
-            WindUI:Notify({
-                Title    = "処理中",
-                Content  = "いま実行中だよ",
-                Duration = 1.0,
-                Icon     = "lucide:clock",
-            })
-            return
-        end
-
-        if exEnabled then
-            scanPlots()
-        end
-
-        local zonesSnapshot = {}
-        for i = 1, #EX_ZONES do
-            local z = EX_ZONES[i]
-            zonesSnapshot[i] = {
-                inst = z.inst,
-                cf   = z.cf,
-                size = z.size,
-            }
-        end
-
-        local others = {}
-        local skippedHouse  = 0
-        local skippedFriend = 0
-
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LP then
-                if
-                    exEnabled
-                    and isPlayerInsideAnyExZone_withSnapshot(plr, zonesSnapshot)
-                then
-                    skippedHouse += 1
-                elseif friendExEnabled and isFriend(plr) then
-                    skippedFriend += 1
-                else
-                    table.insert(others, plr)
-                end
-            end
-        end
-
-        if #others == 0 then
-            WindUI:Notify({
-                Title    = "対象なし",
-                Content  = "除外条件で対象なし",
-                Duration = 1.2,
-                Icon     = "lucide:ban",
-            })
-            return
-        end
-
-        massBusy = true
-        local gap = paceSeconds
-
-        task.spawn(function()
-            if gap >= 0 then
-                for _, t in ipairs(others) do
-                    warpGrabEntry_Mass(t)
-                    if gap <= 0 then
-                        RunService.Heartbeat:Wait()
-                    else
-                        task.wait(gap)
-                    end
-                end
-            else
-                local i = 1
-                while i <= #others do
-                    -- ★ 1フレームで処理する人数をさらに抑える（最大8人）
-                    local burst = math.clamp(2 + math.floor((-gap) * 10), 2, 8)
-                    for _ = 1, burst do
-                        if i > #others then
-                            break
-                        end
-                        warpGrabEntry_Mass(others[i])
-                        i += 1
-                    end
-                    RunService.Heartbeat:Wait()
-                end
-            end
-
-            massBusy = false
-            WindUI:Notify({
-                Title   = "完了",
-                Content = string.format(
-                    "実行:%d / 家スキップ:%d / フレンド:%d（間隔 %.3fs / 全員保持 %.2fs）",
-                    #others,
-                    skippedHouse,
-                    skippedFriend,
-                    gap,
-                    MASS_warpHoldSeconds
-                ),
-                Duration = 2.0,
-                Icon     = "lucide:check-circle",
-            })
-        end)
-    end,
-})
-
---================= あんちタブ =================
-local DefenseTab = Window:Tab({
-    Title = "あんち",
-    Icon  = "lucide:shield",
-})
-
-local D_p = 0.0005
-local autoStruggleCoroutine = nil
-
-local SecAnti = DefenseTab:Section({
-    Title  = "アンチ掴む",
-    Opened = true,
-})
-
-local AntiToggle = SecAnti:Toggle({
-    Title   = "アンチ掴む",
-    Type    = "Checkbox",
-    Default = false,
-    Callback = function(enabled)
-        if enabled then
-            autoStruggleCoroutine = RunService.Heartbeat:Connect(function()
-                local ch = LP.Character
-                if ch and ch:FindFirstChild("Head") then
-                    local head = ch.Head
-                    local partOwner = head:FindFirstChild("PartOwner") or head:FindChild("PartOwner")
-                    if partOwner then
-                        if Struggle then
-                            pcall(function()
-                                Struggle:FireServer()
-                            end)
-                        end
-                        if
-                            ReplicatedStorage:FindFirstChild("GameCorrectionEvents")
-                            and ReplicatedStorage.GameCorrectionEvents:FindFirstChild("StopAllVelocity")
-                        then
-                            pcall(function()
-                                ReplicatedStorage.GameCorrectionEvents.StopAllVelocity:FireServer()
-                            end)
-                        end
-                        for _, part in pairs(ch:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                part.Anchored = true
-                            end
-                        end
-                        while
-                            LP:IsDescendantOf(game)
-                            and LP:FindFirstChild("IsHeld")
-                            and LP.IsHeld.Value
-                        do
-                            task.wait(D_p)
-                        end
-                        for _, part in pairs(ch:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                part.Anchored = false
-                            end
-                        end
-                    end
-                end
-            end)
-        else
-            if autoStruggleCoroutine then
-                autoStruggleCoroutine:Disconnect()
-                autoStruggleCoroutine = nil
-            end
-        end
-        AutoSave()
-    end,
-})
-
---================= アンチぐっち =================
-local antiGucciEnabled = false
-
+local LocalPlayer       = Players.LocalPlayer
+local Character         = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid          = Character:WaitForChild("Humanoid")
+local HRP               = Character:WaitForChild("HumanoidRootPart")
+
+local MenuToys    = ReplicatedStorage:WaitForChild("MenuToys")
+local SpawnRemote = MenuToys:WaitForChild("SpawnToyRemoteFunction")
+local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
+local RagdollRemote   = CharacterEvents:WaitForChild("RagdollRemote")
+
+-- 処理用フラグ
+local antiGucciOn = false
+local blobTasks   = {} -- タスクを格納してあとで停止する用
+
+-- Blobmanを召喚・上空へ飛ばす処理
 local function startAntiGucci()
-    if antiGucciEnabled then
-        return
-    end
-    antiGucciEnabled = true
+    if antiGucciOn then return end
+    antiGucciOn = true
 
-    local Character = LP.Character or LP.CharacterAdded:Wait()
-    local Humanoid  = Character:WaitForChild("Humanoid")
-    local HRP       = Character:WaitForChild("HumanoidRootPart")
+    -- 座る前の位置を記憶
+    local originalCF = HRP.CFrame
 
-    local MenuToys        = ReplicatedStorage:WaitForChild("MenuToys")
-    local SpawnRemote     = MenuToys:WaitForChild("SpawnToyRemoteFunction")
-    local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
-    local RagdollRemote   = CharacterEvents:WaitForChild("RagdollRemote")
+    -- 5スタッド前にBlobmanをスポーン
+    local spawnCF = HRP.CFrame * CFrame.new(0, 0, -5)
+    SpawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
-    local OriginalCFrame = HRP.CFrame
-    local SkyHeight      = 5000000
+    -- Blobman読み込み
+    local toysFolder = workspace:WaitForChild(LocalPlayer.Name.."SpawnedInToys")
+    local Blob = toysFolder:WaitForChild("CreatureBlobman")
 
-    local okSpawn = pcall(function()
-        return SpawnRemote:InvokeServer(
-            "CreatureBlobman",
-            HRP.CFrame + Vector3.new(0, SkyHeight, 0),
-            Vector3.new(0, -16.157, 0)
-        )
-    end)
-    if not okSpawn then
-        antiGucciEnabled = false
-        return
-    end
-
-    local toysFolderName = LP.Name .. "SpawnedInToys"
-    local toysFolder     = Workspace:WaitForChild(toysFolderName, 5)
-    if not toysFolder then
-        antiGucciEnabled = false
-        return
-    end
-
-    local Blob = toysFolder:WaitForChild("CreatureBlobman", 5)
-    if not Blob then
-        antiGucciEnabled = false
-        return
-    end
-
+    -- 全パーツを固定し、ネットワークオーナーを自分に
     for _, part in pairs(Blob:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Anchored = true
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
         end
     end
 
-    local Seat = Blob:FindFirstChild("VehicleSeat") or Blob:FindFirstChildWhichIsA("VehicleSeat")
-    if not Seat then
-        antiGucciEnabled = false
-        return
-    end
+    local Seat = Blob:WaitForChild("VehicleSeat")
 
-    task.spawn(function()
-        while antiGucciEnabled do
+    -- 以降、複数の処理をタスクとして保持
+    -- 自動で座る
+    table.insert(blobTasks, task.spawn(function()
+        while antiGucciOn do
             if Seat.Occupant ~= Humanoid then
                 Seat:Sit(Humanoid)
             end
             task.wait(0.1)
         end
-    end)
+    end))
 
-    task.spawn(function()
-        while antiGucciEnabled do
+    -- 座ったら元の位置に戻す
+    table.insert(blobTasks, task.spawn(function()
+        while antiGucciOn do
             if Humanoid.SeatPart == Seat then
-                HRP.CFrame = OriginalCFrame
+                HRP.CFrame = originalCF
             end
             task.wait(0.1)
         end
-    end)
+    end))
 
-    task.spawn(function()
-        while antiGucciEnabled do
-            pcall(function()
-                if LP:FindFirstChild("IsHeld") then
-                    LP.IsHeld.Value = true
-                end
-            end)
+    -- 拘束状態維持
+    table.insert(blobTasks, task.spawn(function()
+        while antiGucciOn do
+            pcall(function() LocalPlayer.IsHeld.Value = true end)
             task.wait()
         end
-    end)
+    end))
 
-    task.spawn(function()
-        while antiGucciEnabled do
+    -- ラグドール連打
+    table.insert(blobTasks, task.spawn(function()
+        while antiGucciOn do
             for _ = 1, 12 do
-                pcall(function()
-                    RagdollRemote:FireServer(HRP, 0)
-                end)
+                RagdollRemote:FireServer(HRP, 0)
             end
             task.wait()
         end
+    end))
+
+    -- 少し待ってからBlobmanを1億スタッド上へ
+    task.spawn(function()
+        task.wait(1)
+        local targetPos = HRP.Position + Vector3.new(0, 100000000, 0)
+        if Blob.PrimaryPart then
+            Blob:PivotTo(CFrame.new(targetPos))
+        else
+            -- PrimaryPart がない場合は座席を基準に各パーツを移動
+            local origin = Seat.Position
+            for _, part in pairs(Blob:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local offset = part.Position - origin
+                    part.Position = targetPos + offset
+                end
+            end
+        end
     end)
 end
 
+-- 停止処理
 local function stopAntiGucci()
-    antiGucciEnabled = false
+    antiGucciOn = false
+    -- 登録したタスクを停止
+    for _, t in ipairs(blobTasks) do
+        if typeof(t) == "thread" then
+            pcall(function() task.cancel(t) end)
+        end
+    end
+    blobTasks = {}
 end
 
-local AntiGucciToggle = SecAnti:Toggle({
-    Title   = "アンチぐっち",
-    Type    = "Checkbox",
+-- Orion UIのウィンドウとタブを作成
+local Window = OrionLib:MakeWindow({Name = "Anti-Gucci Tool (Orion)", HidePremium = false, SaveConfig = false})
+local Tab    = Window:MakeTab({Name = "Main", Icon = "rbxassetid://7733960981", PremiumOnly = false})
+
+-- トグルを追加
+Tab:AddToggle({
+    Name = "アンチぐっち起動",
     Default = false,
-    Callback = function(on)
-        if on then
+    Callback = function(value)
+        if value then
             startAntiGucci()
         else
             stopAntiGucci()
         end
-        AutoSave()
-    end,
+    end
 })
 
-myConfig:Register("excludeHouses",  ToggleExcludeHouse)
-myConfig:Register("friendWhitelist", ToggleFriendWL)
-myConfig:Register("antiGrab",        AntiToggle)
-myConfig:Register("antiGucci",       AntiGucciToggle)
-
-pcall(function()
-    myConfig:Load()
-end)
-
-if exEnabled then
-    scanPlots()
-    startRescanLoop()
-end
-
--- おしまい
+-- UI起動
+OrionLib:Init()
