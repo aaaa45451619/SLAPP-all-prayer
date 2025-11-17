@@ -1,44 +1,81 @@
-　-- === Anti Gucci テスト用（Orion UI + Blobman） ===
+-- === Anti Gucci テスト用（Orion + Blobman） ===
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local Character   = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid    = Character:WaitForChild("Humanoid")
-local HRP         = Character:WaitForChild("HumanoidRootPart")
 
-local MenuToys      = ReplicatedStorage:WaitForChild("MenuToys")
-local SpawnRemote   = MenuToys:WaitForChild("SpawnToyRemoteFunction")
-local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
-local RagdollRemote   = CharacterEvents:WaitForChild("RagdollRemote")
+--★ ここで変な WaitForChild をしない。キャラは使うときに取り直す。
+--★ Orion を一番最初に出すようにする。
 
 -- ココたん指定の Orion ローダー
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
 
+local Window = OrionLib:MakeWindow({
+    Name        = "Anti-Gucci Test",
+    HidePremium = true,
+    SaveConfig  = false
+})
+
+local Tab = Window:MakeTab({
+    Name        = "Main",
+    Icon        = "rbxassetid://7733960981",
+    PremiumOnly = false
+})
+
 local antiGucciOn = false
 local currentBlob = nil
+
+-- Remotes を安全に取る（無かったら UI 通知出して中断）
+local function getRemotes()
+    local menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
+    local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
+    if not menuToys or not charEvents then
+        OrionLib:MakeNotification({
+            Name = "Error",
+            Content = "MenuToys / CharacterEvents が見つからない",
+            Time = 5
+        })
+        return nil
+    end
+    local spawn = menuToys:FindFirstChild("SpawnToyRemoteFunction")
+    local rag   = charEvents:FindFirstChild("RagdollRemote")
+    if not spawn or not rag then
+        OrionLib:MakeNotification({
+            Name = "Error",
+            Content = "SpawnToyRemoteFunction / RagdollRemote が見つからない",
+            Time = 5
+        })
+        return nil
+    end
+    return spawn, rag
+end
 
 local function startAntiGucci()
     if antiGucciOn then return end
     antiGucciOn = true
 
-    -- 毎回キャラ取り直し（リスパ対策）
-    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    Humanoid  = Character:WaitForChild("Humanoid")
-    HRP       = Character:WaitForChild("HumanoidRootPart")
+    local spawnRemote, ragdollRemote = getRemotes()
+    if not spawnRemote then
+        antiGucciOn = false
+        return
+    end
 
-    -- 1スタッド前に Blobman をスポーン
+    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local Humanoid  = Character:WaitForChild("Humanoid")
+    local HRP       = Character:WaitForChild("HumanoidRootPart")
+
+    -- 1スタッド前に Blobman スポーン
     local spawnCF = HRP.CFrame * CFrame.new(0, 0, -1)
-    SpawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
+    spawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
     -- Blobman 読み込み
     local toysFolder = Workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
     local blob = toysFolder:WaitForChild("CreatureBlobman")
     currentBlob = blob
 
-    -- 全BasePartを固定＋ネットワークオーナーを自分に
+    -- 全BasePartを固定＋ネットワークオーナー自分
     for _, part in ipairs(blob:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Anchored = true
@@ -48,7 +85,6 @@ local function startAntiGucci()
         end
     end
 
-    -- VehicleSeat取得
     local seat = blob:WaitForChild("VehicleSeat")
     local hasRagdolled = false
 
@@ -60,7 +96,8 @@ local function startAntiGucci()
                 hasRagdolled = false
             elseif not hasRagdolled then
                 for _ = 1, 12 do
-                    RagdollRemote:FireServer(HRP, 0)
+                -- ここが「乗った瞬間だけラグドール」
+                    ragdollRemote:FireServer(HRP, 0)
                 end
                 hasRagdolled = true
             end
@@ -68,7 +105,7 @@ local function startAntiGucci()
         end
     end)
 
-    -- ずっと掴まれ状態にする
+    -- ずっと IsHeld = true にして「掴まれ状態」
     task.spawn(function()
         while antiGucciOn and currentBlob == blob do
             pcall(function()
@@ -87,13 +124,16 @@ local function warpBlobUp()
         return
     end
 
-    -- 自分の位置から100億スタッド上
+    -- 自分の位置から100億スタッド上（10,000,000,000）
+    local Character = LocalPlayer.Character
+    local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+
     local targetPos = HRP.Position + Vector3.new(0, 10000000000, 0)
 
     if currentBlob.PrimaryPart then
         currentBlob:PivotTo(CFrame.new(targetPos))
     else
-        -- PrimaryPartが無ければ VehicleSeat or モデル中心を基準に移動
         local seat = currentBlob:FindFirstChild("VehicleSeat") or currentBlob:FindFirstChildWhichIsA("VehicleSeat")
         local origin
         if seat then
@@ -122,21 +162,9 @@ local function stopAntiGucci()
     warpBlobUp()
 end
 
--- === Orion UI セットアップ ===
-local Window = OrionLib:MakeWindow({
-    Name        = "Anti-Gucci Test",
-    HidePremium = true,
-    SaveConfig  = false
-})
-
-local Tab = Window:MakeTab({
-    Name        = "Main",
-    Icon        = "rbxassetid://7733960981",
-    PremiumOnly = false
-})
-
+-- === Orion トグル ===
 Tab:AddToggle({
-    Name    = "アンチぐっち起動",
+    Name    = "Anti Gucci 起動",
     Default = false,
     Callback = function(v)
         if v then
