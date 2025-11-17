@@ -1,6 +1,4 @@
-　-- Anti Gucci (Blobman + Orion UI) シンプル版
--- トグルONで：1スタッド前にBlobman出現 → 固定 → 自動で座る → 座った瞬間だけラグドール＋IsHeld維持
--- トグルOFFで：Blobmanを自キャラ位置から100億スタッド上にワープ
+　-- === Anti Gucci テスト用（Orion UI + Blobman） ===
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,7 +24,7 @@ local function startAntiGucci()
     if antiGucciOn then return end
     antiGucciOn = true
 
-    -- 毎回キャラ取り直し（リスパ対策軽め）
+    -- 毎回キャラ取り直し（リスパ対策）
     Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     Humanoid  = Character:WaitForChild("Humanoid")
     HRP       = Character:WaitForChild("HumanoidRootPart")
@@ -95,7 +93,7 @@ local function warpBlobUp()
     if currentBlob.PrimaryPart then
         currentBlob:PivotTo(CFrame.new(targetPos))
     else
-        -- PrimaryPartが無ければVehicleSeatかモデル中心を基準に移動
+        -- PrimaryPartが無ければ VehicleSeat or モデル中心を基準に移動
         local seat = currentBlob:FindFirstChild("VehicleSeat") or currentBlob:FindFirstChildWhichIsA("VehicleSeat")
         local origin
         if seat then
@@ -124,9 +122,9 @@ local function stopAntiGucci()
     warpBlobUp()
 end
 
--- Orion UI セットアップ
+-- === Orion UI セットアップ ===
 local Window = OrionLib:MakeWindow({
-    Name        = "Anti-Gucci Tool",
+    Name        = "Anti-Gucci Test",
     HidePremium = true,
     SaveConfig  = false
 })
