@@ -1,95 +1,100 @@
--- ===============================================
--- AntiGucci Toggle Script (アンカーなし + Orion UI)
--- ・ブロブマンを自分の 1 スタッド前にスポーン
--- ・座席に自動で座り続ける
--- ・座っている間 HRP を元の場所に戻すループ（見た目固定）
--- ・IsHeld を常に true にして「掴まれ状態」を維持
--- ・ラグドールを連打してアンチグラブ効果を発動
--- ・Orion UI トグルで ON/OFF 切替
--- ===============================================
 
+-- Anti Gucci (Blobman + Orion UI)
+-- このスクリプトは、Blobman を自分の前方に出して座ることでグラブ対策を行います。
+-- ラグドールで拘束状態を維持し、IsHeld を常に true にすることで掴みを防ぎます。
+-- トグルをオンにしてから一定時間後、Blobman を大きく上空へ移動して後始末を行います。
+
+-- 必要なサービスを取得
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
-local LocalPlayer       = Players.LocalPlayer
 
--- Orion UI ライブラリ（公式）
+local LocalPlayer = Players.LocalPlayer
+
+-- Orion UI を読み込む（公式の shlexware/Orion 版）
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/src/Orion.lua"))()
 
--- 状態管理
-local antiGucciActive = false
-local currentBlob     = nil
-local runningTasks    = {}
+-- 状態管理変数
+local antiGucciOn = false
+local currentBlob = nil
+local spawnRemote, ragdollRemote
 
--- リモート取得
-local function getRemotes()
-    local menuToys    = ReplicatedStorage:FindFirstChild("MenuToys")
-    local charEvents  = ReplicatedStorage:FindFirstChild("CharacterEvents")
-    if not menuToys or not charEvents then return nil, nil end
-    local spawnRemote   = menuToys:FindFirstChild("SpawnToyRemoteFunction")
-    local ragdollRemote = charEvents:FindFirstChild("RagdollRemote")
-    return spawnRemote, ragdollRemote
+-- 使用するリモートを取得する関数
+local function GetRemotes()
+    -- 既に取得済みならそのまま
+    if spawnRemote and ragdollRemote then
+        return true
+    end
+    local menuToys   = ReplicatedStorage:FindFirstChild("MenuToys")
+    local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
+    if not menuToys or not charEvents then
+        return false
+    end
+    spawnRemote   = menuToys:FindFirstChild("SpawnToyRemoteFunction")
+    ragdollRemote = charEvents:FindFirstChild("RagdollRemote")
+    return (spawnRemote ~= nil and ragdollRemote ~= nil)
 end
 
--- AntiGucci を開始する処理
-local function startAntiGucci()
-    if antiGucciActive then return end
-    local spawnRemote, ragdollRemote = getRemotes()
-    if not spawnRemote or not ragdollRemote then
-        warn("リモートが見つかりません。")
+-- Anti Gucci を開始する関数
+local function StartAntiGucci()
+    -- すでに起動中なら処理しない
+    if antiGucciOn then
         return
     end
-    antiGucciActive = true
+    -- リモートが取得できなければ中断
+    if not GetRemotes() then
+        return
+    end
+    antiGucciOn = true
 
-    -- 現在のキャラ取得
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    local hrp = char:WaitForChild("HumanoidRootPart")
+    -- ローカルプレイヤーのキャラ情報を取得
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoid  = character:WaitForChild("Humanoid")
+    local hrp       = character:WaitForChild("HumanoidRootPart")
 
-    -- ブロブマンを 1 スタッド前にスポーン
+    -- Blobman を自分の 1 スタッド前にスポーン
     local spawnCF = hrp.CFrame * CFrame.new(0, 0, -1)
     spawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
-    -- Blobman を取得
+    -- Blobman モデルを取得
     local toysFolder = Workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
-    local blob = toysFolder:WaitForChild("CreatureBlobman")
-    currentBlob = blob
+    local blob       = toysFolder:WaitForChild("CreatureBlobman")
+    currentBlob      = blob
 
-    -- ネットワークオーナーを自分に設定（アンカー固定は行わない）
+    -- Blobman の各パーツにネットワークオーナーを設定（アンカーはしない）
     for _, part in ipairs(blob:GetDescendants()) do
         if part:IsA("BasePart") then
-            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+            pcall(function()
+                part:SetNetworkOwner(LocalPlayer)
+            end)
         end
     end
 
-    -- VehicleSeat
+    -- VehicleSeat を取得して一度だけ座らせる
     local seat = blob:WaitForChild("VehicleSeat")
-    -- 座る前の位置を記録
-    local originalCF = hrp.CFrame
-
-    -- 座席に自動で座る処理（乗り直しを抑える）
-    runningTasks.seat = task.spawn(function()
-        while antiGucciActive and currentBlob == blob do
-            if seat.Occupant ~= humanoid then
-                seat:Sit(humanoid)
-            end
-            task.wait(0.1)
+    task.spawn(function()
+        if humanoid and humanoid.Parent then
+            seat:Sit(humanoid)
         end
     end)
 
-    -- 座っている間は HRP を元の位置へ戻す処理
-    runningTasks.tp = task.spawn(function()
-        while antiGucciActive and currentBlob == blob do
-            if humanoid.SeatPart == seat then
-                hrp.CFrame = originalCF
+    -- ラグドール処理：座っている間は定期的にラグドール化する
+    task.spawn(function()
+        while antiGucciOn and currentBlob == blob do
+            if humanoid.Parent then
+                for _ = 1, 12 do
+                    pcall(function()
+                        ragdollRemote:FireServer(hrp, 0)
+                    end)
+                end
             end
-            task.wait(0.1)
+            task.wait(0.25) -- ラグドール連打の間隔
         end
     end)
 
-    -- IsHeld を常に true にして掴まれ状態にする
-    runningTasks.held = task.spawn(function()
-        while antiGucciActive and currentBlob == blob do
+    -- IsHeld を true にし続けて常に掴まれ状態にする
+    task.spawn(function()
+        while antiGucciOn and currentBlob == blob do
             pcall(function()
                 local isHeld = LocalPlayer:FindFirstChild("IsHeld")
                 if isHeld then
@@ -100,53 +105,72 @@ local function startAntiGucci()
         end
     end)
 
-    -- ラグドール化連打
-    runningTasks.ragdoll = task.spawn(function()
-        while antiGucciActive and currentBlob == blob do
-            for _ = 1, 12 do
-                ragdollRemote:FireServer(hrp, 0)
+    -- トグルONから 4 秒後に Blobman を 10 億スタッド上へワープ
+    task.spawn(function()
+        task.wait(4)
+        -- 現在も AntiGucci がオンで Blobman が存在していればワープ
+        if not antiGucciOn or currentBlob ~= blob then
+            return
+        end
+        if not blob or not blob.Parent then
+            return
+        end
+        local curChar = LocalPlayer.Character
+        local curHrp  = curChar and curChar:FindFirstChild("HumanoidRootPart")
+        if not curHrp then
+            return
+        end
+        local targetPos = curHrp.Position + Vector3.new(0, 1000000000, 0)
+        if blob.PrimaryPart then
+            pcall(function()
+                blob:PivotTo(CFrame.new(targetPos))
+            end)
+        else
+            -- PrimaryPart がない場合は座席またはモデル中心を基準に各パーツを移動
+            local originSeat = blob:FindFirstChild("VehicleSeat") or blob:FindFirstChildWhichIsA("BasePart")
+            local originPos  = originSeat and originSeat.Position or blob:GetModelCFrame().Position
+            for _, part in ipairs(blob:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local offset = part.Position - originPos
+                    part.Position = targetPos + offset
+                end
             end
-            task.wait()
         end
     end)
 end
 
--- AntiGucci を停止する処理
-local function stopAntiGucci()
-    if not antiGucciActive then return end
-    antiGucciActive = false
-    -- 各タスクを止める
-    for _, t in pairs(runningTasks) do
-        pcall(function() task.cancel(t) end)
+-- Anti Gucci を停止する関数
+local function StopAntiGucci()
+    if not antiGucciOn then
+        return
     end
-    runningTasks = {}
+    antiGucciOn = false
     currentBlob = nil
 end
 
--- Orion UI ウィンドウ作成
+-- Orion UI の構築
 local window = OrionLib:MakeWindow({
-    Name        = "Anti-Gucci Test",
+    Name        = "Anti Gucci Tool",
     HidePremium = true,
     SaveConfig  = false
 })
+
 local tab = window:MakeTab({
     Name        = "Main",
     Icon        = "rbxassetid://7733960981",
     PremiumOnly = false
 })
 
--- トグル追加
 tab:AddToggle({
-    Name     = "Anti Gucci 起動",
-    Default  = false,
-    Callback = function(on)
-        if on then
-            startAntiGucci()
+    Name    = "Anti Gucci 起動",
+    Default = false,
+    Callback = function(value)
+        if value then
+            StartAntiGucci()
         else
-            stopAntiGucci()
+            StopAntiGucci()
         end
     end
 })
 
--- UI 初期化
 OrionLib:Init()
