@@ -1,10 +1,3 @@
--- Orion UI を使った Blobman アンチぐっちトグル版
--- ・Blobman を自分の1スタッド前にスポーン
--- ・スポーン後、全パーツ Anchored = true ＋ NetworkOwner = LocalPlayer
--- ・座席に乗った瞬間だけラグドール化（連打）
--- ・LocalPlayer.IsHeld を常に true にして掴まれ状態維持
--- ・トグルを OFF にしたとき、Blobman を自キャラ位置から 10億スタッド上にワープ
-
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/src/Orion.lua"))()
 
 local Players           = game:GetService("Players")
@@ -21,6 +14,7 @@ local antiGucciOn = false
 local blobTasks   = {}
 local currentBlob = nil
 
+-- 起動処理
 local function startAntiGucci()
     if antiGucciOn then return end
     antiGucciOn = true
@@ -29,25 +23,21 @@ local function startAntiGucci()
     local spawnCF = HRP.CFrame + HRP.CFrame.LookVector * 1
     SpawnRemote:InvokeServer("CreatureBlobman", spawnCF, Vector3.new(0, -16.157, 0))
 
-    -- Blobman 読み込み
     local toysFolder = workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
     local blob = toysFolder:WaitForChild("CreatureBlobman")
     currentBlob = blob
 
-    -- 全パーツ Anchored + NetworkOwner を自分に
     for _, part in pairs(blob:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Anchored = true
-            pcall(function()
-                part:SetNetworkOwner(LocalPlayer)
-            end)
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
         end
     end
 
     local seat = blob:WaitForChild("VehicleSeat")
     local hasRagdolled = false
 
-    -- 自動で座る＋乗った瞬間だけラグドール連打
+    -- 自動で座る＋乗った瞬間にラグドール
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             if seat.Occupant ~= Humanoid then
@@ -63,7 +53,7 @@ local function startAntiGucci()
         end
     end))
 
-    -- ずっと IsHeld = true にして「掴まれ状態」を維持
+    -- ずっと掴まれている状態にする
     table.insert(blobTasks, task.spawn(function()
         while antiGucciOn do
             pcall(function()
@@ -74,31 +64,26 @@ local function startAntiGucci()
     end))
 end
 
+-- 停止処理（ワープ）
 local function stopAntiGucci()
     if not antiGucciOn then return end
     antiGucciOn = false
 
-    -- タスク全部止める
     for _, t in ipairs(blobTasks) do
         if typeof(t) == "thread" then
-            pcall(function()
-                task.cancel(t)
-            end)
+            pcall(function() task.cancel(t) end)
         end
     end
     blobTasks = {}
 
-    -- 最後に Blobman を自分の位置から 10億スタッド上へワープ
+    -- 最後にBlobmanを10億スタッド上へ
     if currentBlob and currentBlob.Parent then
-        local targetPos = HRP.Position + Vector3.new(0, 1000000000, 0) -- 10^9
-
+        local targetPos = HRP.Position + Vector3.new(0, 1000000000, 0)
         if currentBlob.PrimaryPart then
             currentBlob:PivotTo(CFrame.new(targetPos))
         else
-            -- PrimaryPart が無ければ VehicleSeat かモデル中心を基準に移動
             local seat = currentBlob:FindFirstChild("VehicleSeat") or currentBlob:FindFirstChildWhichIsA("VehicleSeat")
             local origin = seat and seat.Position or currentBlob:GetModelCFrame().Position
-
             for _, part in pairs(currentBlob:GetDescendants()) do
                 if part:IsA("BasePart") then
                     local offset = part.Position - origin
@@ -107,25 +92,15 @@ local function stopAntiGucci()
             end
         end
     end
-
     currentBlob = nil
 end
 
 -- Orion UI ウィンドウとトグル
-local Window = OrionLib:MakeWindow({
-    Name        = "Anti-Gucci Tool",
-    HidePremium = false,
-    SaveConfig  = false
-})
-
-local Tab = Window:MakeTab({
-    Name        = "Main",
-    Icon        = "rbxassetid://7733960981",
-    PremiumOnly = false
-})
+local Window = OrionLib:MakeWindow({Name="Anti-Gucci Tool", HidePremium=false, SaveConfig=false})
+local Tab    = Window:MakeTab({Name="Main", Icon="rbxassetid://7733960981", PremiumOnly=false})
 
 Tab:AddToggle({
-    Name    = "アンチぐっち起動",
+    Name = "アンチぐっち起動",
     Default = false,
     Callback = function(value)
         if value then
