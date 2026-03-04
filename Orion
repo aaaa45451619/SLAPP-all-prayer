@@ -1,4 +1,4 @@
--- ううこれはおりおん、
+-- うんち༼  ຶ.̮   ຶ༽
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -512,7 +512,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local Minimized = false
 	local Loaded = false
 	local UIHidden = false
-	local Zoomed = false
+	local ZoomState = 0  -- 0: 通常, 1: 通常拡大, 2: 最拡大
 	
 
 	WindowConfig = WindowConfig or {}
@@ -814,36 +814,37 @@ function OrionLib:MakeWindow(WindowConfig)
 			WindowTopBarLine.Visible = false
 			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
 
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 140, 0, 50)}):Play()
+			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, (WindowName.TextBounds.X + 140) * 1.5, 0, 75)}):Play()
 			wait(0.1)
 			WindowStuff.Visible = false	
 		end
 		Minimized = not Minimized    
 	end)
 
-	-- 拡大/縮小トグル（アニメーション付き）
-	local ZoomNormalSize = UDim2.new(0, 615, 0, 344)
-	local ZoomNormalPos  = UDim2.new(0.5, -307, 0.5, -172)
-	local ZoomBigSize    = UDim2.new(0, 900, 0, 504)
-	local ZoomBigPos     = UDim2.new(0.5, -450, 0.5, -252)
+	-- 拡大/縮小トグル（3段階・アニメーション付き）
+	local ZoomSizes = {
+		[0] = {size = UDim2.new(0, 615, 0, 344), pos = UDim2.new(0.5, -307, 0.5, -172)},  -- 通常
+		[1] = {size = UDim2.new(0, 750, 0, 420), pos = UDim2.new(0.5, -375, 0.5, -210)},  -- 通常拡大
+		[2] = {size = UDim2.new(0, 870, 0, 488), pos = UDim2.new(0.5, -435, 0.5, -244)},  -- 最拡大
+	}
 
 	AddConnection(ZoomBtn.MouseButton1Up, function()
-		if Zoomed then
-			-- 縮小アニメーション
-			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-				Size = ZoomNormalSize,
-				Position = ZoomNormalPos
-			}):Play()
+		-- 0 → 1 → 2 → 0 の順に循環
+		ZoomState = (ZoomState + 1) % 3
+		local target = ZoomSizes[ZoomState]
+
+		local easeDir = ZoomState == 0 and Enum.EasingDirection.In or Enum.EasingDirection.Out
+		TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, easeDir), {
+			Size = target.size,
+			Position = target.pos
+		}):Play()
+
+		-- アイコン: 通常=縮小アイコン, 拡大中=拡大アイコン
+		if ZoomState == 0 then
 			ZoomBtn.Ico.Image = "rbxassetid://7072720870"
 		else
-			-- 拡大アニメーション
-			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = ZoomBigSize,
-				Position = ZoomBigPos
-			}):Play()
 			ZoomBtn.Ico.Image = "rbxassetid://7072719338"
 		end
-		Zoomed = not Zoomed
 	end)
 
 
