@@ -1,3 +1,4 @@
+-- ううこれはおりおん、
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -511,6 +512,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local Minimized = false
 	local Loaded = false
 	local UIHidden = false
+	local Zoomed = false
 	
 
 	WindowConfig = WindowConfig or {}
@@ -595,13 +597,13 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), "Text")
 	})
 
-	-- 拡大縮小トグルボタン
-	local ScaleBtn = SetChildren(SetProps(MakeElement("Button"), {
+	local ZoomBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1
 	}), {
-		AddThemeObject(SetProps(MakeElement("Image", "maximize-2"), {
-			Position = UDim2.new(0, 11, 0, 6),
+		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072720870"), {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
 			Size = UDim2.new(0, 18, 0, 18),
 			Name = "Ico"
 		}), "Text")
@@ -671,7 +673,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -160, 2, 0),
+		Size = UDim2.new(1, -165, 2, 0),
 		Position = UDim2.new(0, 25, 0, -24),
 		Font = Enum.Font.GothamBlack,
 		TextSize = 20
@@ -701,14 +703,13 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), {
 			WindowName,
 			WindowTopBarLine,
-			-- 拡大縮小ボタン（プラスボタンの左側）
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
-				Size = UDim2.new(0, 40, 0, 30),
-				Position = UDim2.new(1, -140, 0, 10),
-				Name = "ScaleFrame"
+				Size = UDim2.new(0, 36, 0, 30),
+				Position = UDim2.new(1, -133, 0, 10),
+				Name = "ZoomBtnFrame"
 			}), {
 				AddThemeObject(MakeElement("Stroke"), "Stroke"),
-				ScaleBtn
+				ZoomBtn
 			}), "Second"),
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
 				Size = UDim2.new(0, 70, 0, 30),
@@ -820,31 +821,31 @@ function OrionLib:MakeWindow(WindowConfig)
 		Minimized = not Minimized    
 	end)
 
-	-- 拡大縮小トグル処理（アニメーション付き）
-	local Scaled = false
-	local NormalSize = UDim2.new(0, 615, 0, 344)
-	local ScaledSize = UDim2.new(0, 820, 0, 460)
-	local ScaleIconIn  = GetIcon("maximize-2") or "rbxassetid://7072720870"
-	local ScaleIconOut = GetIcon("minimize-2")  or "rbxassetid://7072719338"
-	ScaleBtn.Ico.Image = ScaleIconIn
+	-- 拡大/縮小トグル（アニメーション付き）
+	local ZoomNormalSize = UDim2.new(0, 615, 0, 344)
+	local ZoomNormalPos  = UDim2.new(0.5, -307, 0.5, -172)
+	local ZoomBigSize    = UDim2.new(0, 900, 0, 504)
+	local ZoomBigPos     = UDim2.new(0.5, -450, 0.5, -252)
 
-	AddConnection(ScaleBtn.MouseButton1Up, function()
-		if Minimized then return end
-		if Scaled then
+	AddConnection(ZoomBtn.MouseButton1Up, function()
+		if Zoomed then
 			-- 縮小アニメーション
-			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = NormalSize
+			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+				Size = ZoomNormalSize,
+				Position = ZoomNormalPos
 			}):Play()
-			ScaleBtn.Ico.Image = ScaleIconIn
+			ZoomBtn.Ico.Image = "rbxassetid://7072720870"
 		else
 			-- 拡大アニメーション
 			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = ScaledSize
+				Size = ZoomBigSize,
+				Position = ZoomBigPos
 			}):Play()
-			ScaleBtn.Ico.Image = ScaleIconOut
+			ZoomBtn.Ico.Image = "rbxassetid://7072719338"
 		end
-		Scaled = not Scaled
+		Zoomed = not Zoomed
 	end)
+
 
 	local function LoadSequence()
 		MainWindow.Visible = false
