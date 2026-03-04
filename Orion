@@ -1,3 +1,4 @@
+-- 障害者の呼吸！1の方！ あうううううう
 --feather icons https://github.com/evoincorp/lucideblox/tree/master/src/modules/util
 --more icons here https://icon-sets.iconify.design/material-symbols/?icon-filter=note
 --more icons here https://www.svgrepo.com/vectors/gui/2
@@ -554,34 +555,38 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end)
 
+	-- ボタン幅 (Zoom | Minimize | Close) を1つのグループに
+	local BtnW = 34
+
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
-		Position = UDim2.new(0.5, 0, 0, 0),
+		Size = UDim2.new(0, BtnW, 1, 0),
+		Position = UDim2.new(0, BtnW * 2, 0, 0),
 		BackgroundTransparency = 1
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072725342"), {
-			Position = UDim2.new(0, 9, 0, 6),
-			Size = UDim2.new(0, 18, 0, 18)
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(0, 16, 0, 16)
 		}), "Text")
 	})
 
 	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
+		Size = UDim2.new(0, BtnW, 1, 0),
+		Position = UDim2.new(0, BtnW, 0, 0),
 		BackgroundTransparency = 1
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072719338"), {
-			Position = UDim2.new(0, 9, 0, 6),
-			Size = UDim2.new(0, 18, 0, 18),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(0, 16, 0, 16),
 			Name = "Ico"
 		}), "Text")
 	})
 
-	-- Zoom toggle button (拡大/縮小)
-	local ZoomIcoExpand = "rbxassetid://7072720870"  -- expand/maximize icon
-	local ZoomIcoShrink = "rbxassetid://7072719338"  -- will override below
-
+	-- 拡大/縮小ボタン (グループ左端)
 	local ZoomBtnInner = SetProps(MakeElement("Button"), {
-		Size = UDim2.new(1, 0, 1, 0),
+		Size = UDim2.new(0, BtnW, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
 		BackgroundTransparency = 1
 	})
 	local ZoomIco = AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072720870"), {
@@ -591,15 +596,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		Name = "Ico"
 	}), "Text")
 	ZoomIco.Parent = ZoomBtnInner
-
-	local ZoomFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
-		Size = UDim2.new(0, 30, 0, 30),
-		Position = UDim2.new(1, -130, 0, 10),
-		Name = "ZoomFrame"
-	}), {
-		AddThemeObject(MakeElement("Stroke"), "Stroke"),
-		ZoomBtnInner
-	}), "Second")
 
 	local DragPoint = SetProps(MakeElement("TFrame"), {
 		Size = UDim2.new(1, 0, 0, 50)
@@ -738,19 +734,26 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), {
 			WindowName,
 			WindowTopBarLine,
-			ZoomFrame,
+			-- [🔍+ | — | ✕] 統合ボタングループ
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
-				Size = UDim2.new(0, 70, 0, 30),
-				Position = UDim2.new(1, -90, 0, 10)
+				Size = UDim2.new(0, BtnW * 3, 0, 30),
+				Position = UDim2.new(1, -(BtnW * 3 + 20), 0, 10)
 			}), {
 				AddThemeObject(MakeElement("Stroke"), "Stroke"),
+				-- 区切り線1 (zoom|minimize)
 				AddThemeObject(SetProps(MakeElement("Frame"), {
 					Size = UDim2.new(0, 1, 1, 0),
-					Position = UDim2.new(0.5, 0, 0, 0)
-				}), "Stroke"),	
-				CloseBtn,
-				MinimizeBtn
-			}), "Second"),	
+					Position = UDim2.new(0, BtnW, 0, 0)
+				}), "Stroke"),
+				-- 区切り線2 (minimize|close)
+				AddThemeObject(SetProps(MakeElement("Frame"), {
+					Size = UDim2.new(0, 1, 1, 0),
+					Position = UDim2.new(0, BtnW * 2, 0, 0)
+				}), "Stroke"),
+				ZoomBtnInner,
+				MinimizeBtn,
+				CloseBtn
+			}), "Second"),
 		}),
 		DragPoint,
 		WindowStuff
@@ -892,15 +895,13 @@ function OrionLib:MakeWindow(WindowConfig)
 	end)
 
 
-	-- 拡大/縮小トグル (Zoom Toggle with Animation)
+	-- 拡大/縮小トグル (画面サイズ対応アニメーション)
 	local NormalSize     = UDim2.new(0, 615, 0, 344)
 	local NormalPosition = UDim2.new(0.5, -307, 0.5, -172)
-	local ZoomedSize     = UDim2.new(0, 860, 0, 480)
-	local ZoomedPosition = UDim2.new(0.5, -430, 0.5, -240)
 
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
 		if Minimized then
-			local targetSize = Zoomed and ZoomedSize or NormalSize
+			local targetSize = Zoomed and MainWindow.Size or NormalSize
 			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = targetSize}):Play()
 			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
 			wait(.02)
@@ -920,38 +921,35 @@ function OrionLib:MakeWindow(WindowConfig)
 	end)
 
 	AddConnection(ZoomBtnInner.MouseButton1Up, function()
-		if Minimized then return end  -- ミニマイズ中は無効
+		if Minimized then return end
 
 		if Zoomed then
-			-- 縮小アニメーション
-			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-				Size = NormalSize,
+			-- 縮小: 元のサイズに戻す (Back.In でバウンス)
+			TweenService:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+				Size     = NormalSize,
 				Position = NormalPosition
 			}):Play()
-			-- アイコンをスピンしてから戻す
-			TweenService:Create(ZoomIco, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				ImageTransparency = 1
-			}):Play()
-			wait(0.2)
+			TweenService:Create(ZoomIco, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 1}):Play()
+			wait(0.15)
 			ZoomIco.Image = "rbxassetid://7072720870"
-			TweenService:Create(ZoomIco, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				ImageTransparency = 0
-			}):Play()
+			TweenService:Create(ZoomIco, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
 		else
-			-- 拡大アニメーション
-			TweenService:Create(MainWindow, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = ZoomedSize,
+			-- 拡大: 画面サイズの 90% に合わせる
+			local vp  = workspace.CurrentCamera.ViewportSize
+			local pad = 40
+			local zW  = math.floor(vp.X - pad * 2)
+			local zH  = math.floor(vp.Y - pad * 2)
+			local ZoomedSize     = UDim2.new(0, zW, 0, zH)
+			local ZoomedPosition = UDim2.new(0.5, -math.floor(zW / 2), 0.5, -math.floor(zH / 2))
+
+			TweenService:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Size     = ZoomedSize,
 				Position = ZoomedPosition
 			}):Play()
-			-- アイコンフェードして切り替え
-			TweenService:Create(ZoomIco, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				ImageTransparency = 1
-			}):Play()
-			wait(0.2)
+			TweenService:Create(ZoomIco, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 1}):Play()
+			wait(0.15)
 			ZoomIco.Image = "rbxassetid://7072725342"
-			TweenService:Create(ZoomIco, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				ImageTransparency = 0
-			}):Play()
+			TweenService:Create(ZoomIco, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
 		end
 		Zoomed = not Zoomed
 	end)
