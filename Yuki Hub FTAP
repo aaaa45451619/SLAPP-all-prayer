@@ -1,2 +1,3 @@
--- や、やばい このスクリプト弱すぎる
-loadstring(game:HttpGet("https://raw.githubusercontent.com/aaaa45451619/Yuki/refs/heads/145/message%20(11).txt"))()
+-- や、やばい このスクリプトつよすぎる！
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/aaaa45451619/Yuki/refs/heads/145/Lua__3__fixed.lua_10_1.obfuscated.lua.txt"))()
